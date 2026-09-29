@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlmodel import Field, SQLModel, text
+from sqlmodel import Field, SQLModel
 
 from src.models.enums import UserRole
 

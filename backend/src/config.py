@@ -6,10 +6,10 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace( "postgresql://", "postgresql+psycopg://", 1,)
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 
 JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -19,7 +19,6 @@ def validate_config():
     required = {
         "DATABASE_URL": DATABASE_URL,
         "JWT_SECRET": JWT_SECRET,
-        "JWT_ALGORITHM": JWT_ALGORITHM,
     }
 
     missing = []
