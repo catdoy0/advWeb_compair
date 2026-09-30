@@ -7,26 +7,14 @@ export default function BackendStatusBanner() {
   const [backendAvailable, setBackendAvailable] = useState(true)
 
   useEffect(() => {
-    let mounted = true
-
     async function check() {
       const result = await checkBackend()
 
-      if (!mounted) {
-        return
-      }
 
       setBackendAvailable(result !== null)
     }
 
     check()
-
-    const interval = setInterval(check, 5000)
-
-    return () => {
-      mounted = false
-      clearInterval(interval)
-    }
   }, [])
 
   if (backendAvailable) {
