@@ -9,6 +9,14 @@ import CommonDashboardHeader from "../components/common/layout/CommonDashboardHe
 import Overview from "../modules/dashboard/content/Overview";
 import AreYouSureModal from "../components/common/modals/AreYouSureModal";
 import { useState } from "react";
+import Messages from "../modules/dashboard/content/Messages";
+import Appointments from "../modules/dashboard/content/Appointments";
+import MyDevices from "../modules/dashboard/content/MyDevices";
+import Profile from "../modules/dashboard/content/Profile";
+import { dummySession } from "../dummyData";
+
+
+
 
 export default function DashboardPage() {
   const [isAreYouSureModalOpen, setIsAreYouSureModalOpen] = useState(false)
@@ -17,20 +25,14 @@ export default function DashboardPage() {
   const type = searchParams.get("type") || "overview";
   const { session, logout } = useAuth();
 
-  // ProtectedRoute already kicks out unauthenticated users. While the
-  // session is still resolving, just render nothing.
-  if (!session) return null;
+ const currentSession = session ?? dummySession;
 
-  const { user } = session;
+  const { user } = currentSession;
   const hasName = Boolean(user.firstName || user.lastName);
   const fullName = hasName
     ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
     : user.email;
-  const initials = (
-    hasName
-      ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`
-      : user.email[0] ?? "?"
-  ).toUpperCase();
+  const initials = ( hasName ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}` : user.email[0] ?? "?").toUpperCase();
 
   const contentLabel = getContentLabel(user.role, type);
 
@@ -54,12 +56,11 @@ export default function DashboardPage() {
 
           <div className="flex-1">
             {type === "overview" && <Overview />}
-            {/* TODO: add remaining content modules as they are created:
-                {type === "messages" && <Messages />}
-                {type === "appointments" && <Appointments />}
-                {type === "mydevices" && <MyDevices />}
-                {type === "profile" && <Profile />}
-            */}
+            {type === "messages" && <Messages />}
+            {type === "appointments" && <Appointments />}
+            {type === "mydevices" && <MyDevices />}
+            {type === "profile" && <Profile />}
+            
           </div>
         </div>
       </div>

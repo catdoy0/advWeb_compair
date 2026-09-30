@@ -1,4 +1,9 @@
 import { useAuth } from "../../../context/AuthContext";
+import CustomerOverview from "./customer/CustomerOverview";
+
+import { dummySession } from "../../../dummyData";
+
+
 
 /**
  * Overview content for the dashboard.
@@ -12,15 +17,30 @@ import { useAuth } from "../../../context/AuthContext";
  * For now every role sees the same placeholder.
  */
 export default function Overview() {
-  const { session } = useAuth();
-  const role = session?.user.role ?? "UNKNOWN";
 
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">Hello World</h1>
-      <p className="mt-2 text-slate-500 dark:text-slate-400">
-        Overview content for role: {role}
-      </p>
-    </div>
-  );
+  const { session } = useAuth();
+
+ const currentSession = session ?? dummySession;
+
+  const { user } = currentSession;
+
+  const role = user?.role;
+
+  if (role === "CUSTOMER") {
+    return <CustomerOverview />;
+  }
+
+  if (role === "TECHNICIAN") {
+    return <TechnicianOverview />;
+  }
+
+  if (role === "STAFF") {
+    return <StaffOverview />;
+  }
+
+  if (role === "ADMIN") {
+    return <AdminOverview />;
+  }
+
+  return null;
 }

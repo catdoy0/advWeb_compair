@@ -12,6 +12,7 @@ import TestComponent from './pages/TestComponent'
 import { ROUTES } from './routes'
 import ProtectedRoute from './components/ProtectedRoute'
 import PublicRoute from './components/PublicRoute'
+import BackendStatusBanner from './components/BackendStatusBanner'
 
 export default function App() {
 
@@ -19,6 +20,8 @@ export default function App() {
     <AuthProvider>
       <ThemeProvider>
         <BrowserRouter>
+
+          <BackendStatusBanner />
           <Routes>
 
 
@@ -35,7 +38,7 @@ export default function App() {
             }/>
 
               <Route path={ROUTES.DASHBOARD} element={
-                <ProtectedRoute skip={false}>
+                <ProtectedRoute skip={true}>
                   <DashboardPage/>
                 </ProtectedRoute>
               }/>

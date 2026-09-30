@@ -2,6 +2,8 @@
 
 python 3.14.7
 
+better if done in a python venv
+
 ```sh
 pip install -r requirements
 

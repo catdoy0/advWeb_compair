@@ -22,5 +22,5 @@ export interface SignUpPayload {
   lastName: string;
   email: string;
   password: string;
-  confirm_password: string; // matches backend schema exactly
+  confirm_password: string;
 }
