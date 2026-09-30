@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from jwt import PyJWTError
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from src.config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 from src.database import get_session
@@ -70,7 +70,7 @@ def check_session(response: Response, request: Request, session: SessionDep):
             return {
                 "user": {
                     "id": int(claims["sub"]),
-                    "email": user.email,
+                    "email": user.email.lower().strip(),
                     "firstName": user.first_name,
                     "lastName": user.last_name,
                     "role": user.role.value,
@@ -97,5 +97,9 @@ def logout(response: Response, request: Request, session: SessionDep):
 
 @router.post("/check-email-taken")
 def check_email_taken(data: CheckEmailRequest, session: SessionDep):
-    taken = session.exec(select(Users).where(Users.email == data.email)).first() is not None
+    taken = session.exec(
+        select(Users).where(
+            func.lower(Users.email) == data.email.strip().lower()
+        )
+    ).first() is not None
     return {"email": data.email, "taken": taken}

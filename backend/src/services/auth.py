@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import update
-from sqlmodel import Session, col, select
+from sqlmodel import Session, col, func, select
 
 from src.models.refresh_sessions import Refresh_Session
 from src.models.users import Users
@@ -57,9 +57,9 @@ def signup_user(
         raise HTTPException(status_code=409, detail="Email is already registered")
 
     user = Users(
-        first_name=data.firstName,
-        last_name=data.lastName,
-        email=data.email,
+        first_name=data.firstName.strip(),
+        last_name=data.lastName.strip(),
+        email=data.email.lower().strip(),
         password_hash=hash_password(data.password),
     )
     session.add(user)
@@ -73,7 +73,13 @@ def signin_user(
     session: Session,
     data: LoginRequest,
 ) -> tuple[Users, str, str]:
-    user = session.exec(select(Users).where(Users.email == data.email)).first()
+    email = data.email.strip().lower()
+
+    user = session.exec(
+        select(Users).where(
+            func.lower(Users.email) == email
+        )
+    ).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

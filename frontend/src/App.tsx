@@ -38,7 +38,7 @@ export default function App() {
             }/>
 
               <Route path={ROUTES.DASHBOARD} element={
-                <ProtectedRoute skip={true}>
+                <ProtectedRoute skip={false}>
                   <DashboardPage/>
                 </ProtectedRoute>
               }/>
