@@ -22,7 +22,7 @@ export default function RepairRequests() {
       </div>
 
       <div className="p-4">
-        <div className="rounded-lg bg-[#f6f8fb] p-4">
+        <div className="rounded-lg bg-[#f6f8fb] dark:bg-slate-900 p-4">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-lg font-bold text-[#17385f] dark:text-white">
