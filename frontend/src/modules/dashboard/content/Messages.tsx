@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
+import PageHeader from "../components/PageHeader";
+import UserAvatar from "../../../components/common/widgets/UserAvatar";
 
 interface Conversation {
   id: string;
@@ -45,33 +47,23 @@ export default function Messages() {
   });
 
   return (
-    <main className="flex-1 bg-[#f7f9fc] dark:bg-[#0f1724]">
+    <main className="flex-1  dark:bg-[#0f1724]">
       <div className="mx-auto max-w-[1240px] p-5 lg:p-7">
-        {/* Header */}
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#2870e8]">
-              Customer care / inbox
-            </p>
 
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#102c50] dark:text-white">
-              Service messages
-            </h1>
-
-            <p className="mt-1 max-w-[600px] text-[12px] leading-5 text-slate-500 dark:text-slate-400">
-              Keep repair conversations attached to the request so customers
-              always know what happens next.
-            </p>
-          </div>
-
-          <CommonButton
-            variant="outline"
-            className="flex items-center gap-2 self-start border-[#d4ddea] px-4 py-2 xl:self-auto"
-          >
-            <ArrowDownToLine size={14} />
-            Export inbox
-          </CommonButton>
-        </div>
+        <PageHeader
+          eyebrow="Customer care / inbox"
+          title="Service messages"
+          description="Keep repair conversations attached to the request so customers always know what happens next."
+          action={
+            <CommonButton
+              variant="outline"
+              className="flex items-center gap-2 self-start border-[#d4ddea] px-4 py-2 xl:self-auto"
+            >
+              <ArrowDownToLine size={14} />
+              Export inbox
+            </CommonButton>
+          }
+        />
 
         {/* Messages workspace */}
         <div className="mt-6 grid h-[590px] gap-4 lg:grid-cols-[373px_minmax(0,1fr)]">
@@ -132,9 +124,10 @@ export default function Messages() {
                     }`}
                   >
                     {/* Avatar */}
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#dceaff] text-[9px] font-bold text-[#2870e8]">
-                      {conversation.initials}
-                    </div>
+                    {/* <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#dceaff] text-[9px] font-bold text-[#2870e8]"> */}
+                    {/*   {conversation.initials} */}
+                    {/* </div> */}
+                    <UserAvatar variant="messages" initials={conversation.initials} />
 
                     {/* Conversation info */}
                     <div className="min-w-0 flex-1">

@@ -52,11 +52,10 @@ export default function AreYouSureModal({
         {description}
       </p>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row justify-end gap-2">
         <CommonButton
           onClick={onClose}
           variant="outline"
-          className="flex-1"
         >
           {cancelLabel}
         </CommonButton>
@@ -64,7 +63,6 @@ export default function AreYouSureModal({
         <CommonButton
           onClick={handleConfirm}
           variant="primary"
-          className="flex-1"
         >
           {confirmLabel}
         </CommonButton>

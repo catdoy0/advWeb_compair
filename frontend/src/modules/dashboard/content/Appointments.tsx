@@ -13,6 +13,7 @@ import DataTable, {
 
 import type { Status } from "../../../components/common/widgets/StatusBox";
 import StatusBox from "../../../components/common/widgets/StatusBox";
+import PageHeader from "../components/PageHeader";
 
 interface Appointment {
   id: string;
@@ -28,6 +29,8 @@ interface AppointmentDay {
   appointments: number;
 }
 
+// temp data 
+// TODO: replace with real data from backend
 const weekDays: AppointmentDay[] = [
   {
     day: "SUN",
@@ -117,30 +120,20 @@ export default function Appointments() {
   };
 
   return (
-    <main className="flex-1 bg-[#f7f9fc] dark:bg-[#0f1724]">
+    <main className="flex-1 dark:bg-[#0f1724]">
       <div className="mx-auto max-w-[1240px] p-5 lg:p-7">
-        {/* Header */}
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#2870e8]">
-              Operations / schedule
-            </p>
 
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#102c50] dark:text-white">
-              Appointments
-            </h1>
-
-            <p className="mt-1 max-w-[700px] text-[12px] leading-5 text-slate-500 dark:text-slate-400">
-              Make the day predictable for customers and technicians with a
-              shared repair schedule.
-            </p>
-          </div>
-
-          <CommonButton className="flex items-center gap-2 self-start px-4 py-2 xl:self-auto">
-            <Plus size={15} />
-            New computer repair request
-          </CommonButton>
-        </div>
+        <PageHeader
+          eyebrow="Operations / schedule"
+          title="Appointments"
+          description="Make the day predictable for customers and technicians with a shared repair schedule."
+          action={
+            <CommonButton className="flex items-center gap-2 px-4 py-2">
+              <Plus size={15} />
+              New computer repair request
+            </CommonButton>
+          }
+        />
 
         {/* Appointment week */}
         <section className="mt-6 rounded-lg border border-[#d8e0eb] bg-white dark:border-slate-700 dark:bg-[#111c2b]">
