@@ -31,7 +31,7 @@ def add_user(user: Users) -> Users:
     with Session(engine) as s:
         s.add(user)
         s.commit()
-        s.refresh(user)   # reload attrs so they survive after close
+        s.refresh(user)
         return user
 
 

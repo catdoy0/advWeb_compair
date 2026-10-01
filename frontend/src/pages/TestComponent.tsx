@@ -15,6 +15,8 @@ import GoogleLogo from "../components/common/widgets/GoogleLogo"
 import UserAvatar from "../components/common/widgets/UserAvatar"
 import CommonDashboardHeader from "../components/common/layout/CommonDashboardHeader"
 import CommonDashboardSidebar from "../components/common/layout/CommonDashboardSidebar"
+import DataTable from "../components/common/widgets/DataTable"
+import StatusBox from "../components/common/widgets/StatusBox"
 
 function ShowcaseSection({
   title,
@@ -157,6 +159,49 @@ export default function TestComponent() {
             <CommonButton onClick={() => setIsModalOpen(true)}>
               Open Modal
             </CommonButton>
+          </ShowcaseSection>
+
+          <ShowcaseSection title="DataTable">
+            <DataTable
+              columns={
+                [
+                  {
+                    key: "time",
+                    label: "Time",
+                    className: "w-[16%]",
+                  },
+                  {
+                    key: "computer",
+                    label: "Computer",
+                    className: "w-[32%]",
+                  },
+                  {
+                    key: "service",
+                    label: "Service",
+                    className: "w-[32%]",
+                  },
+                  {
+                    key: "status",
+                    label: "Status",
+                    className: "w-[20%]",
+                    render: () => (
+                      <StatusBox status="Confirmed" />
+                    ),
+                  },
+                ]
+              }
+              data={
+                [
+                  {
+                    id: "APT-1001",
+                    time: "11:00",
+                    computer: 'MacBook Pro 14"',
+                    service: "Initial diagnosis",
+                    status: "Confirmed",
+                  },
+                ]
+              }
+            />
           </ShowcaseSection>
 
           <ShowcaseSection title="CommonBackground">
