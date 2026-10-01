@@ -25,7 +25,9 @@ def _jwt_secret() -> str:
 
 
 def create_access_token(user: Users) -> str:
-    """Create a signed, short-lived token with the UI's basic user claims."""
+    """Create a signed, short-lived token with the UI's basic user claims.
+        access_token at path="/"
+    """
     if user.id is None:
         raise ValueError("Cannot issue a token for a user without an ID")
 
@@ -62,6 +64,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
         audience=JWT_AUDIENCE,
         options={"require": ["sub", "type", "role", "iat", "exp", "iss", "aud"]},
     )
+    print(payload)
     if payload.get("type") != "access":
         raise jwt.InvalidTokenError("Expected an access token")
     if not isinstance(payload.get("sub"), str) or not payload["sub"].isdecimal():

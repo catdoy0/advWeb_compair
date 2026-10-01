@@ -2,10 +2,6 @@ import { API_URL } from "./config";
 import type { UserSession, SignUpPayload } from "../types/auth";
 
 
-/*
- * TODO:
- * Change later for backend endpoint
- */
 export async function login(email: string, password: string): Promise<UserSession | null>{
   const res = await fetch(`${API_URL}/auth/signin`, {
     method: "POST",

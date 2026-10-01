@@ -1,5 +1,3 @@
-import sys
-
 from sqlalchemy import inspect
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, create_engine, select
@@ -18,27 +16,22 @@ def get_session():
         yield session
 
 
-def assert_database_ready() -> None:
-    """
-    Verify the DB is reachable and the `users` table exists.
-    Exits the process if not.
-    """
+def assert_database_ready() -> bool:
     try:
         with engine.connect() as conn:
             inspector = inspect(conn)
             tables = inspector.get_table_names()
-    except SQLAlchemyError as exc:
-        print(f"[db] FATAL: could not connect to database: {exc}", file=sys.stderr)
-        sys.exit(1)
+
+    except SQLAlchemyError:
+        print("[db] Can't connect to database.")
+        return False
 
     if "users" not in tables:
-        print(
-            f"[db] FATAL: 'users' table not found. Existing tables: {tables}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        print("[db] 'users' table not found.")
+        return False
 
-    print(f"[db] Connected. Tables: {tables}")
+    print("[db] Connected.")
+    return True
 
 
 DEFAULT_ROOT_EMAIL = "compair@gmail.com"

@@ -30,6 +30,8 @@ const customerSections: DashboardSidebarSection[] = [
  * temporarily pointed at the same sections just so the app doesn't crash
  * for those roles — replace each with real nav items once we know what
  * Technician/Staff/Admin/Super Admin should actually see.
+ *
+ * tldr: for rbac
  */
 export const dashboardSectionsByRole: Record<Role, DashboardSidebarSection[]> = {
   CUSTOMER: customerSections,

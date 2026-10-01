@@ -12,7 +12,8 @@ from src.routes.auth import router as authRouter
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_config()
-    assert_database_ready()
+    if not assert_database_ready():
+        return
     ensure_default_super_admin()
     print(f"""
         {app.title}
