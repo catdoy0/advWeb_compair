@@ -14,6 +14,8 @@ import DataTable, {
 import type { Status } from "../../../components/common/widgets/StatusBox";
 import StatusBox from "../../../components/common/widgets/StatusBox";
 import PageHeader from "../components/PageHeader";
+import DashboardPage from "../components/DashboardPage";
+import DashboardPanel from "../components/DashboardPanel";
 
 interface Appointment {
   id: string;
@@ -120,8 +122,7 @@ export default function Appointments() {
   };
 
   return (
-    <main className="flex-1 dark:bg-[#0f1724]">
-      <div className="mx-auto max-w-[1240px] p-5 lg:p-7">
+    <DashboardPage>
 
         <PageHeader
           eyebrow="Operations / schedule"
@@ -136,7 +137,7 @@ export default function Appointments() {
         />
 
         {/* Appointment week */}
-        <section className="mt-6 rounded-lg border border-[#d8e0eb] bg-white dark:border-slate-700 dark:bg-[#111c2b]">
+        <DashboardPanel className="mt-6">
           {/* Week header */}
           <div className="flex items-center justify-between px-5 pt-5">
             <div>
@@ -202,29 +203,19 @@ export default function Appointments() {
               );
             })}
           </div>
-        </section>
+        </DashboardPanel>
 
         {/* Appointments + next appointment */}
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.9fr)]">
           {/* Appointments table */}
-          <section className="overflow-hidden rounded-lg border border-[#d8e0eb] bg-white dark:border-slate-700 dark:bg-[#111c2b]">
-            <div className="flex items-center justify-between border-b border-[#d8e0eb] px-5 py-4 dark:border-slate-700">
-              <div>
-                <h2 className="text-[14px] font-bold text-[#102c50] dark:text-white">
-                  Your appointments
-                </h2>
-
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Your computer repair appointments only.
-                </p>
-              </div>
-
-              <span className="rounded bg-[#e7f6ef] px-2 py-1 text-[10px] font-bold text-[#159a63]">
+          <DashboardPanel
+            title="Your appointments"
+            description="Your computer repair appointments only."
+            headerAction={<span className="rounded bg-[#e7f6ef] px-2 py-1 text-[10px] font-bold text-[#159a63]">
                 {appointments.length} appointment
                 {appointments.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-
+              </span>}
+          >
             <DataTable
               columns={appointmentColumns}
               data={
@@ -234,20 +225,10 @@ export default function Appointments() {
               }
               emptyMessage="No appointments scheduled for this day."
             />
-          </section>
+          </DashboardPanel>
 
           {/* Next appointment */}
-          <section className="overflow-hidden rounded-lg border border-[#d8e0eb] bg-white dark:border-slate-700 dark:bg-[#111c2b]">
-            <div className="border-b border-[#d8e0eb] px-5 py-4 dark:border-slate-700">
-              <h2 className="text-[14px] font-bold text-[#102c50] dark:text-white">
-                Your next appointment
-              </h2>
-
-              <p className="mt-1 text-[11px] text-slate-400">
-                Only your computer repair booking details.
-              </p>
-            </div>
-
+          <DashboardPanel title="Your next appointment" description="Only your computer repair booking details.">
             {nextAppointment ? (
               <div className="grid grid-cols-2 gap-x-6 gap-y-5 p-5">
                 <div>
@@ -297,9 +278,8 @@ export default function Appointments() {
                 </p>
               </div>
             )}
-          </section>
+          </DashboardPanel>
         </div>
-      </div>
-    </main>
+    </DashboardPage>
   );
 }

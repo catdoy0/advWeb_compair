@@ -6,6 +6,8 @@ import AreYouSureModal from "../../../components/common/modals/AreYouSureModal";
 import PageHeader from "../components/PageHeader";
 import { useAuth } from "../../../context/AuthContext";
 import { dummySession } from "../../../dummyData";
+import DashboardPage from "../components/DashboardPage";
+import DashboardPanel from "../components/DashboardPanel";
 
 const inputClass =
   "h-10 w-full rounded-md border border-[#cfd9e8] bg-white px-3 text-[12px] text-[#102c50] outline-none placeholder:text-slate-400 focus:border-[#2870e8] dark:border-slate-600 dark:bg-[#182536] dark:text-white";
@@ -47,8 +49,7 @@ export default function Profile() {
   };
 
   return (
-    <main className="flex-1 dark:bg-[#0f1724]">
-      <div className="mx-auto max-w-[1240px] p-5 lg:p-7">
+    <DashboardPage>
         <PageHeader
           eyebrow="Account / profile"
           title="My profile"
@@ -67,22 +68,14 @@ export default function Profile() {
 
         <div className="mt-6 grid items-start gap-4 lg:grid-cols-2">
           {/* Account profile */}
-          <section className="overflow-hidden rounded-lg border border-[#d8e0eb] bg-white dark:border-slate-700 dark:bg-[#111c2b]">
-            <div className="flex items-start justify-between gap-3 border-b border-[#d8e0eb] px-5 py-3 dark:border-slate-700">
-              <div>
-                <h2 className="text-[14px] font-bold text-[#102c50] dark:text-white">
-                  Account profile
-                </h2>
-                <p className="mt-0.5 text-[11px] text-slate-400">
-                  Your identity and access details for this workspace.
-                </p>
-              </div>
-
-              <span className="rounded bg-[#e3f5ec] px-2 py-0.5 text-[10px] font-semibold text-[#168a52] dark:bg-[#12332a] dark:text-[#4ade80]">
+          <DashboardPanel
+            title="Account profile"
+            description="Your identity and access details for this workspace."
+            headerClassName="py-3"
+            headerAction={<span className="rounded bg-[#e3f5ec] px-2 py-0.5 text-[10px] font-semibold text-[#168a52] dark:bg-[#12332a] dark:text-[#4ade80]">
                 Active
-              </span>
-            </div>
-
+              </span>}
+          >
             <div className="p-5">
               {/* Identity */}
               <div className="flex items-center gap-3 border-b border-[#e6ebf2] pb-5 dark:border-slate-700">
@@ -157,19 +150,10 @@ export default function Profile() {
                 </CommonButton>
               </div>
             </div>
-          </section>
+          </DashboardPanel>
 
           {/* Change password */}
-          <section className="overflow-hidden rounded-lg border border-[#d8e0eb] bg-white dark:border-slate-700 dark:bg-[#111c2b]">
-            <div className="border-b border-[#d8e0eb] px-5 py-3 dark:border-slate-700">
-              <h2 className="text-[14px] font-bold text-[#102c50] dark:text-white">
-                Change password
-              </h2>
-              <p className="mt-0.5 text-[11px] text-slate-400">
-                Use a private password that only you can use to sign in.
-              </p>
-            </div>
-
+          <DashboardPanel title="Change password" description="Use a private password that only you can use to sign in." headerClassName="py-3">
             <div className="p-5">
               <div>
                 <label htmlFor="current-password" className={labelClass}>
@@ -231,9 +215,9 @@ export default function Profile() {
                 staff passwords to a surname-based default from Administration.
               </p>
             </div>
-          </section>
+          </DashboardPanel>
         </div>
-      </div>
+    
 
       <AreYouSureModal
         open={isLogoutOpen}
@@ -241,6 +225,6 @@ export default function Profile() {
         onConfirm={logout}
         title="Are you sure you want to log out?"
       />
-    </main>
+    </DashboardPage>
   );
 }

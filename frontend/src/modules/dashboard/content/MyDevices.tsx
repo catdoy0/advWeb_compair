@@ -4,6 +4,8 @@ import CommonButton from "../../../components/common/widgets/CommonButton";
 import DataTable, { type DataTableColumn } from "../../../components/common/widgets/DataTable";
 import type { Status } from "../../../components/common/widgets/StatusBox";
 import StatusBox from "../../../components/common/widgets/StatusBox";
+import DashboardPage from "../components/DashboardPage";
+import DashboardPanel from "../components/DashboardPanel";
 
 
 interface ComputerRecord {
@@ -57,8 +59,7 @@ const yourComputersColumns: DataTableColumn<ComputerRecord>[] = [
 
 export default function MyDevices() {
   return (
-    <main className="flex-1 dark:bg-[#0f1724]">
-      <div className="mx-auto max-w-[1240px] p-5 lg:p-7">
+    <DashboardPage>
 
         <PageHeader
           eyebrow="Directory / Devices"
@@ -75,30 +76,19 @@ export default function MyDevices() {
         />
 
 
-        <section className="mt-6 overflow-hidden rounded-lg border border-[#d8e0eb] bg-white dark:border-slate-700 dark:bg-[#111c2b]">
-          <div className="flex items-center justify-between border-b border-[#d8e0eb] px-5 py-4 dark:border-slate-700">
-            <div>
-              <h2 className="text-[14px] font-bold text-[#102c50] dark:text-white">
-                Your appointments
-              </h2>
-
-              <p className="mt-1 text-[11px] text-slate-400">
-                Your computer repair appointments only.
-              </p>
-            </div>
-
-            <span className="rounded bg-[#e7f6ef] px-2 py-1 text-[10px] font-bold text-[#159a63]">
-            </span>
-          </div>
-
+        <DashboardPanel
+          className="mt-6"
+          title="Your appointments"
+          description="Your computer repair appointments only."
+          headerAction={<span className="rounded bg-[#e7f6ef] px-2 py-1 text-[10px] font-bold text-[#159a63]" />}
+        >
           <DataTable
             columns={yourComputersColumns}
             data={ yourComputers }
             emptyMessage="No appointments scheduled for this day."
           />
-        </section>
+        </DashboardPanel>
 
-      </div>
-    </main>
+    </DashboardPage>
   )
 }

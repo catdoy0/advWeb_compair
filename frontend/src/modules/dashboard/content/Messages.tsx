@@ -9,6 +9,8 @@ import {
 import CommonButton from "../../../components/common/widgets/CommonButton";
 import PageHeader from "../components/PageHeader";
 import UserAvatar from "../../../components/common/widgets/UserAvatar";
+import DashboardPage from "../components/DashboardPage";
+import DashboardPanel from "../components/DashboardPanel";
 
 interface Conversation {
   id: string;
@@ -47,8 +49,7 @@ export default function Messages() {
   });
 
   return (
-    <main className="flex-1  dark:bg-[#0f1724]">
-      <div className="mx-auto max-w-[1240px] p-5 lg:p-7">
+    <DashboardPage>
 
         <PageHeader
           eyebrow="Customer care / inbox"
@@ -68,7 +69,7 @@ export default function Messages() {
         {/* Messages workspace */}
         <div className="mt-6 grid h-[590px] gap-4 lg:grid-cols-[373px_minmax(0,1fr)]">
           {/* Inbox */}
-          <section className="overflow-hidden rounded-lg border border-[#d8e0eb] bg-white dark:border-slate-700 dark:bg-[#111c2b]">
+          <DashboardPanel contentClassName="h-full">
             {/* Inbox header */}
             <div className="border-b border-[#d8e0eb] px-4 py-3 dark:border-slate-700">
               <div className="flex items-center justify-between">
@@ -164,10 +165,10 @@ export default function Messages() {
                 </div>
               )}
             </div>
-          </section>
+          </DashboardPanel>
 
           {/* Conversation */}
-          <section className="flex min-w-0 items-center justify-center rounded-lg border border-[#d8e0eb] bg-white dark:border-slate-700 dark:bg-[#111c2b]">
+          <DashboardPanel contentClassName="flex h-full w-full min-w-0 items-center justify-center">
             {selectedConversation ? (
               <div className="flex h-full w-full flex-col">
                 {/* Conversation header */}
@@ -222,9 +223,8 @@ export default function Messages() {
                 </p>
               </div>
             )}
-          </section>
+          </DashboardPanel>
         </div>
-      </div>
-    </main>
+    </DashboardPage>
   );
 }

@@ -10,11 +10,11 @@ import StatCard from "../../components/StatCard";
 import RepairRequests from "../../components/RepairRequests";
 import MessageShop from "../../components/MessageShop";
 import PageHeader from "../../components/PageHeader";
+import DashboardPage from "../../components/DashboardPage";
 
 export default function CustomerOverview() {
   return (
-    <main className="flex-1 bg-[#f7f9fc] dark:bg-[#0f1724]">
-      <div className="mx-auto max-w-[1180px] p-5 lg:p-7">
+    <DashboardPage maxWidth="1180px" className="bg-[#f7f9fc] dark:bg-[#0f1724]">
         {/* Header */}
 
         <PageHeader
@@ -72,7 +72,6 @@ export default function CustomerOverview() {
 
           <MessageShop />
         </div>
-      </div>
-    </main>
+    </DashboardPage>
   );
 }
