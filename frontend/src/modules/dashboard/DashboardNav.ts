@@ -1,8 +1,11 @@
 import {
+    Archive,
   CalendarDays,
   LayoutDashboard,
   MessageCircle,
   Monitor,
+  Settings,
+  ShieldCheck,
   UserRound,
 } from "lucide-react"
 
@@ -25,6 +28,22 @@ const customerSections: DashboardSidebarSection[] = [
   },
 ]
 
+
+const superAdminSections: DashboardSidebarSection[] = [
+  {
+    label: "Main",
+    items: [
+      { label: "Adminstration", href: "?type=adminstration", icon: ShieldCheck },
+      { label: "Settings", href: "?type=settings", icon: Settings },
+      { label: "Profile", href: "?type=profile", icon: UserRound },
+    ],
+  },
+  {
+    label: "System",
+    items: [{ label: "Archive", href: "?type=archive", icon: Archive}],
+  },
+]
+
 /**
  * One nav config per role. Customer is the real one; everyone else is
  * temporarily pointed at the same sections just so the app doesn't crash
@@ -38,5 +57,5 @@ export const dashboardSectionsByRole: Record<Role, DashboardSidebarSection[]> = 
   TECHNICIAN: customerSections, // TODO
   STAFF: customerSections, // TODO
   ADMIN: customerSections, // TODO
-  SUPER_ADMIN: customerSections, // TODO
+  SUPER_ADMIN: superAdminSections,
 }

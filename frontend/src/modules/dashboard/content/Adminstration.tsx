@@ -1,0 +1,351 @@
+import { useState } from "react";
+import {
+  Archive,
+  Download,
+  RotateCcw,
+  UserPlus,
+} from "lucide-react";
+
+import CommonButton from "../../../components/common/widgets/CommonButton";
+import DataTable, {
+  type DataTableColumn,
+} from "../../../components/common/widgets/DataTable";
+import PageHeader from "../components/PageHeader";
+import DashboardPage from "../components/DashboardPage";
+import DashboardPanel from "../components/DashboardPanel";
+
+type AccountRole = "Customer" | "Technician" | "Staff" | "Administrator";
+
+interface Account {
+  id: string;
+  name: string;
+  email: string;
+  role: AccountRole;
+  status: "Active" | "Suspended";
+  lastSignIn: string;
+}
+
+const accounts: Account[] = [
+  {
+    id: "USR-001",
+    name: "Mika Santos",
+    email: "mika@compair.local",
+    role: "Customer",
+    status: "Active",
+    lastSignIn: "Today, 10:42 AM",
+  },
+  {
+    id: "USR-002",
+    name: "Rafael Gomez",
+    email: "rafael@compair.local",
+    role: "Technician",
+    status: "Active",
+    lastSignIn: "Today, 8:18 AM",
+  },
+  {
+    id: "USR-003",
+    name: "Joshua D. Bunag",
+    email: "admin@compair.local",
+    role: "Administrator",
+    status: "Active",
+    lastSignIn: "Just now",
+  },
+  {
+    id: "USR-005",
+    name: "Avery Cruz",
+    email: "staff@compair.local",
+    role: "Staff",
+    status: "Active",
+    lastSignIn: "Today, 9:06 AM",
+  },
+];
+
+const accountColumns: DataTableColumn<Account>[] = [
+  {
+    key: "account",
+    label: "Account",
+    render: (account) => (
+      <>
+        <p className="text-[11px] font-bold text-[#102c50] dark:text-white">
+          {account.name}
+        </p>
+        <p className="mt-0.5 text-[9px] text-slate-400">
+          {account.email} · {account.id}
+        </p>
+      </>
+    ),
+  },
+  { key: "role", label: "Role" },
+  {
+    key: "status",
+    label: "Status",
+    render: (account) => (
+      <span className="inline-flex rounded bg-[#e6f5ef] px-2 py-1 text-[9px] font-bold text-[#15946a]">
+        {account.status}
+      </span>
+    ),
+  },
+  { key: "lastSignIn", label: "Last sign in" },
+  {
+    key: "actions",
+    label: "Actions",
+    render: () => <AccountActions />,
+  },
+];
+
+type AccountFilter = "All accounts" | AccountRole;
+
+export default function Adminstration() {
+  const [activeFilter, setActiveFilter] =
+    useState<AccountFilter>("All accounts");
+
+  const filteredAccounts =
+    activeFilter === "All accounts"
+      ? accounts
+      : accounts.filter((account) => account.role === activeFilter);
+
+  const customerCount = accounts.filter(
+    (account) => account.role === "Customer",
+  ).length;
+
+  const technicianCount = accounts.filter(
+    (account) => account.role === "Technician",
+  ).length;
+
+  const staffCount = accounts.filter(
+    (account) => account.role === "Staff",
+  ).length;
+
+  const administratorCount = accounts.filter(
+    (account) => account.role === "Administrator",
+  ).length;
+
+  return (
+    <DashboardPage
+      maxWidth="1240px"
+      className="flex-1 bg-[#f7f9fc] dark:bg-[#0f1724]"
+    >
+        {/* Header */}
+        <PageHeader
+          eyebrow="Manage / Access"
+          title="Account administration"
+          description="Manage access, review account status, and keep recoverable workspace backups."
+        />
+
+        {/* Statistics */}
+        <div className="mt-6 grid gap-3 lg:grid-cols-3">
+          <SummaryCard
+            label="Managed accounts"
+            value={accounts.length}
+            detail={`${accounts.filter((account) => account.status === "Active").length} active accounts`}
+          />
+
+          <SummaryCard
+            label="Customer accounts"
+            value={customerCount}
+            detail="Customer portal access"
+          />
+
+          <SummaryCard
+            label="Latest backup"
+            value="None"
+            detail="Create a recoverable workspace copy"
+            valueText
+          />
+        </div>
+
+        {/* Account management */}
+        <DashboardPanel
+          className="mt-5"
+          title="Account management"
+          description="Filter users by role, then grant, suspend, restore, or reset access without deleting account history."
+          headerClassName="items-start border-0 px-5 pb-0 pt-3"
+          contentClassName=""
+          headerAction={
+            <CommonButton className="flex shrink-0 items-center gap-2 px-4 py-2">
+              Create account
+              <UserPlus size={14} />
+            </CommonButton>
+          }
+        >
+          <div className="border-b border-[#d8e0eb] px-5 pb-2 dark:border-slate-700">
+            <div className="flex gap-1 overflow-x-auto">
+              <AccountFilterButton
+                label="All accounts"
+                count={accounts.length}
+                active={activeFilter === "All accounts"}
+                onClick={() => setActiveFilter("All accounts")}
+              />
+
+              <AccountFilterButton
+                label="Customers"
+                count={customerCount}
+                active={activeFilter === "Customer"}
+                onClick={() => setActiveFilter("Customer")}
+              />
+
+              <AccountFilterButton
+                label="Technicians"
+                count={technicianCount}
+                active={activeFilter === "Technician"}
+                onClick={() => setActiveFilter("Technician")}
+              />
+
+              <AccountFilterButton
+                label="Staff"
+                count={staffCount}
+                active={activeFilter === "Staff"}
+                onClick={() => setActiveFilter("Staff")}
+              />
+
+              <AccountFilterButton
+                label="Administrators"
+                count={administratorCount}
+                active={activeFilter === "Administrator"}
+                onClick={() => setActiveFilter("Administrator")}
+              />
+            </div>
+          </div>
+          <DataTable
+            columns={accountColumns}
+            data={filteredAccounts}
+            emptyMessage="No accounts found for this role."
+          />
+        </DashboardPanel>
+
+        {/* Backups */}
+        <DashboardPanel
+          className="mt-8"
+          title="Workspace backups"
+          description="Create a point-in-time copy before major changes."
+          headerClassName="flex-col items-start px-5 py-3 sm:flex-row sm:items-center sm:justify-between"
+          headerAction={
+            <div className="flex gap-2">
+              <CommonButton
+                variant="outline"
+                className="flex items-center gap-2 border-[#d4ddea] px-4 py-2"
+                disabled
+              >
+                <RotateCcw size={14} />
+                Restore backup
+              </CommonButton>
+
+              <CommonButton className="flex items-center gap-2 px-4 py-2">
+                <Download size={14} />
+                Create backup
+              </CommonButton>
+            </div>
+          }
+        >
+          {/* Empty state */}
+          <div className="flex min-h-[210px] flex-col items-center justify-center text-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#eef4ff] text-[#2870e8]">
+              <Download size={16} />
+            </div>
+
+            <h3 className="mt-4 text-[14px] font-bold text-[#102c50] dark:text-white">
+              No backups yet
+            </h3>
+
+            <p className="mt-1 text-[11px] text-slate-400">
+              Create one before changing account access or inventory.
+            </p>
+          </div>
+        </DashboardPanel>
+    </DashboardPage>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  detail,
+  valueText = false,
+}: {
+  label: string;
+  value: number | string;
+  detail: string;
+  valueText?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-[#d8e0eb] bg-white px-4 py-4 dark:border-slate-700 dark:bg-[#111c2b]">
+      <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+        {label}
+      </p>
+
+      <p
+        className={`mt-4 font-semibold text-[#102c50] dark:text-white ${
+          valueText ? "text-[19px]" : "text-[27px]"
+        }`}
+      >
+        {value}
+      </p>
+
+      <p className="mt-1 text-[11px] text-slate-400">{detail}</p>
+    </div>
+  );
+}
+
+function AccountFilterButton({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold transition-colors ${
+        active
+          ? "bg-[#eef4ff] text-[#2870e8] ring-1 ring-[#cfe0ff]"
+          : "text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
+      }`}
+    >
+      {label}
+
+      <span
+        className={
+          active
+            ? "text-[#7da9ee]"
+            : "text-slate-400"
+        }
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function AccountActions() {
+  return (
+    <div className="flex items-center gap-5 whitespace-nowrap">
+          <button
+            type="button"
+            className="text-[10px] font-semibold text-[#2870e8] hover:underline"
+          >
+            Suspend
+          </button>
+
+          <button
+            type="button"
+            className="text-[10px] font-semibold text-[#2870e8] hover:underline"
+          >
+            Reset password
+          </button>
+
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-[10px] font-semibold text-[#2870e8] hover:underline"
+          >
+            <Archive size={13} />
+            Archive
+          </button>
+    </div>
+  );
+}

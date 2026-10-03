@@ -15,6 +15,8 @@ import MyDevices from "../modules/dashboard/content/MyDevices";
 import Profile from "../modules/dashboard/content/Profile";
 import { dummySession } from "../dummyData";
 
+import Adminstration from "../modules/dashboard/content/Adminstration";
+import SettingsDashboard from "../modules/dashboard/content/Settings";
 
 
 
@@ -60,6 +62,10 @@ export default function DashboardPage() {
             {type === "appointments" && <Appointments />}
             {type === "mydevices" && <MyDevices />}
             {type === "profile" && <Profile />}
+
+
+            {type == "adminstration" && <Adminstration/>}
+            {type == "settings" && <SettingsDashboard/>}
             
           </div>
         </div>
