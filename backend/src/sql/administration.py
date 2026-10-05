@@ -93,3 +93,16 @@ def get_total_users():
         "administrator_total": counts.get("ADMIN", 0) + counts.get("SUPER_ADMIN", 0),
     }
 
+
+def set_user_active(user_id: int, is_active: bool) -> bool:
+    try:
+        with Session(engine) as s:
+            user = s.get(Users, user_id)
+            if not user:
+                return False
+            user.is_active = is_active
+            s.commit()
+        return True
+    except SQLAlchemyError as e:
+        print(f"set_user_active failed: {e}")
+        return False

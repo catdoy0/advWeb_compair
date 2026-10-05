@@ -9,9 +9,14 @@ from src.security.tokens import hash_refresh_token
 
 
 def get_user_by_email(email: str) -> Users | None:
+    cleaned_email = email.strip().lower()
+
     with Session(engine) as s:
         return s.exec(
-            select(Users).where(func.lower(Users.email) == email.strip().lower())
+            select(Users).where(
+                func.lower(Users.email) == cleaned_email,
+                Users.is_active == True
+            )
         ).first()
 
 

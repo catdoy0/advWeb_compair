@@ -6,7 +6,7 @@ from src.sql import administration as admin_sql
 
 router = APIRouter()
 
-AUTHORIZED_ROLE = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.STAFF, UserRole.TECHNICIAN]
+AUTHORIZED_ROLE = [UserRole.SUPER_ADMIN, UserRole.ADMIN]
 
 
 @router.get("/get-users")
@@ -35,3 +35,19 @@ def get_total_users(request: Request, response: Response):
         )
 
     return admin_sql.get_total_users()
+
+
+@router.post("/set-user-active")
+def set_user_active(
+    request: Request,
+    response: Response,
+    user_id: int,
+    is_active: bool,
+):
+    if not check_user_role(request, response, [UserRole.SUPER_ADMIN]):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to access this resource",
+        )
+
+    return admin_sql.set_user_active(user_id, is_active)

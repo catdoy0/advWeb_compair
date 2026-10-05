@@ -52,7 +52,7 @@ def check_user_role(
         "refresh_token",
         refresh_token,
         max_age=REFRESH_MAX_AGE,
-        path="/auth",
+        path="/",
         httponly=True,
         secure=False,
         samesite="lax",

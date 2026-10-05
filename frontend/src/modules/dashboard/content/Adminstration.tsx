@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Archive,
-  Download,
-  RotateCcw,
-  UserPlus,
-} from "lucide-react";
+import { Download, RotateCcw } from "lucide-react";
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
 import DataTable, {
@@ -14,99 +9,66 @@ import PageHeader from "../components/PageHeader";
 import DashboardPage from "../components/DashboardPage";
 import DashboardPanel from "../components/DashboardPanel";
 
-import { getUsers, getTotalUsers } from "../../../api/administration";
-import type { GetUsers, TotalUsers } from "../../../types/administration";
-
-type AccountRole = "Customer" | "Technician" | "Staff" | "Administrator";
-
-interface Account {
-  id: string;
-  name: string;
-  email: string;
-  role: AccountRole;
-  status: "Active" | "Suspended";
-  lastSignIn: string;
-}
-
-const ROLE_LABEL: Record<string, AccountRole> = {
-  CUSTOMER: "Customer",
-  TECHNICIAN: "Technician",
-  STAFF: "Staff",
-  ADMIN: "Administrator",
-  SUPER_ADMIN: "Administrator",
-};
-
-function formatLastSignIn(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-
-  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const sameDay = d.toDateString() === new Date().toDateString();
-  if (sameDay) return `Today, ${time}`;
-
-  return d.toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function toAccount(u: GetUsers): Account {
-  const name =
-    [u.first_name, u.last_name].filter(Boolean).join(" ") || u.email;
-
-  return {
-    id: `USR-${String(u.id).padStart(3, "0")}`,
-    name,
-    email: u.email,
-    role: ROLE_LABEL[u.role] ?? "Customer",
-    status: u.is_active ? "Active" : "Suspended",
-    lastSignIn: formatLastSignIn(u.last_sign_in),
-  };
-}
-
-const accountColumns: DataTableColumn<Account>[] = [
-  {
-    key: "account",
-    label: "Account",
-    render: (account) => (
-      <>
-        <p className="text-[11px] font-bold text-[#102c50] dark:text-white">
-          {account.name}
-        </p>
-        <p className="mt-0.5 text-[9px] text-slate-400">
-          {account.email} · {account.id}
-        </p>
-      </>
-    ),
-  },
-  { key: "role", label: "Role" },
-  {
-    key: "status",
-    label: "Status",
-    render: (account) => (
-      <span className="inline-flex rounded bg-[#e6f5ef] px-2 py-1 text-[9px] font-bold text-[#15946a]">
-        {account.status}
-      </span>
-    ),
-  },
-  { key: "lastSignIn", label: "Last sign in" },
-  {
-    key: "actions",
-    label: "Actions",
-    render: () => <AccountActions />,
-  },
-];
-
-type AccountFilter = "All accounts" | AccountRole;
+import { getUsers, getTotalUsers, setUserActive } from "../../../api/administration";
+import type { TotalUsers } from "../../../types/administration";
+import AreYouSureModal from "../../../components/common/modals/AreYouSureModal";
+import AccountActions from "./administration/AccountActions";
+import AccountFilterButton from "./administration/AccountFilterButton";
+import SummaryCard from "./administration/SummaryCard";
+import { toAccount } from "./administration/accountUtils";
+import type { Account, AccountFilter } from "./administration/types";
 
 export default function Adminstration() {
+  const [suspendModalOpen, setSuspendModalOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
   const [activeFilter, setActiveFilter] =
     useState<AccountFilter>("All accounts");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [totals, setTotals] = useState<TotalUsers | null>(null);
   const [loading, setLoading] = useState(true);
+
+
+  const accountColumns: DataTableColumn<Account>[] = [
+    {
+      key: "account",
+      label: "Account",
+      render: (account) => (
+        <>
+          <p className="text-[11px] font-bold text-[#102c50] dark:text-white">
+            {account.name}
+          </p>
+          <p className="mt-0.5 text-[9px] text-slate-400">
+            {account.email} · {account.id}
+          </p>
+        </>
+      ),
+    },
+    { key: "role", label: "Role" },
+    {
+      key: "status",
+      label: "Status",
+      render: (account) => (
+        <span className="inline-flex rounded bg-[#e6f5ef] px-2 py-1 text-[9px] font-bold text-[#15946a]">
+          {account.status}
+        </span>
+      ),
+    },
+    { key: "lastSignIn", label: "Last sign in" },
+    {
+      key: "actions",
+      label: "Actions",
+      render: (account) => (
+        <AccountActions
+          account={account}
+          onSuspend={(a) => {
+            setSelectedAccount(a);
+            setSuspendModalOpen(true);
+          }}
+        />
+      ),
+    },
+  ];
 
   useEffect(() => {
     let cancelled = false;
@@ -145,6 +107,32 @@ export default function Adminstration() {
       maxWidth="1240px"
       className="flex-1 bg-[#f7f9fc] dark:bg-[#0f1724]"
     >
+      <AreYouSureModal
+        open={suspendModalOpen}
+        onClose={() => {
+          setSuspendModalOpen(false);
+          setSelectedAccount(null);
+        }}
+        onConfirm={async () => {
+          if (!selectedAccount) return;
+
+          const rawId = Number(selectedAccount.id.replace("USR-", ""));
+
+          await setUserActive(rawId, false);
+
+          setAccounts((prev) =>
+            prev.map((a) =>
+              a.id === selectedAccount.id ? { ...a, status: "Suspended" } : a,
+            ),
+          );
+
+          setSuspendModalOpen(false);
+          setSelectedAccount(null);
+        }}
+        header={`Suspend ${selectedAccount?.name ?? ""}`}
+        description="They will no longer be able to sign in until access is restored."
+      />
+
       {/* Header */}
       <PageHeader
         eyebrow="Manage / Access"
@@ -181,12 +169,6 @@ export default function Adminstration() {
         description="Filter users by role, then grant, suspend, restore, or reset access without deleting account history."
         headerClassName="items-start border-0 px-5 pb-0 pt-3"
         contentClassName=""
-        headerAction={
-          <CommonButton className="flex shrink-0 items-center gap-2 px-4 py-2">
-            Create account
-            <UserPlus size={14} />
-          </CommonButton>
-        }
       >
         <div className="border-b border-[#d8e0eb] px-5 pb-2 dark:border-slate-700">
           <div className="flex gap-1 overflow-x-auto">
@@ -275,99 +257,5 @@ export default function Adminstration() {
         </div>
       </DashboardPanel>
     </DashboardPage>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  detail,
-  valueText = false,
-}: {
-  label: string;
-  value: number | string;
-  detail: string;
-  valueText?: boolean;
-}) {
-  return (
-    <div className="rounded-lg border border-[#d8e0eb] bg-white px-4 py-4 dark:border-slate-700 dark:bg-[#111c2b]">
-      <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-        {label}
-      </p>
-
-      <p
-        className={`mt-4 font-semibold text-[#102c50] dark:text-white ${
-          valueText ? "text-[19px]" : "text-[27px]"
-        }`}
-      >
-        {value}
-      </p>
-
-      <p className="mt-1 text-[11px] text-slate-400">{detail}</p>
-    </div>
-  );
-}
-
-function AccountFilterButton({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold transition-colors ${
-        active
-          ? "bg-[#eef4ff] text-[#2870e8] ring-1 ring-[#cfe0ff]"
-          : "text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
-      }`}
-    >
-      {label}
-
-      <span
-        className={
-          active
-            ? "text-[#7da9ee]"
-            : "text-slate-400"
-        }
-      >
-        {count}
-      </span>
-    </button>
-  );
-}
-
-function AccountActions() {
-  return (
-    <div className="flex items-center gap-5 whitespace-nowrap">
-          <button
-            type="button"
-            className="text-[10px] font-semibold text-[#2870e8] hover:underline"
-          >
-            Suspend
-          </button>
-
-          <button
-            type="button"
-            className="text-[10px] font-semibold text-[#2870e8] hover:underline"
-          >
-            Reset password
-          </button>
-
-          <button
-            type="button"
-            className="flex items-center gap-1.5 text-[10px] font-semibold text-[#2870e8] hover:underline"
-          >
-            <Archive size={13} />
-            Archive
-          </button>
-    </div>
   );
 }

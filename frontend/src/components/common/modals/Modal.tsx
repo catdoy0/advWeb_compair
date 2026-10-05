@@ -62,7 +62,7 @@ export default function Modal({
       <div
         className={`
         relative
-        w-full ${large ? "max-w-4xl overflow-x-auto" : "max-w-xl"} rounded-3xl bg-white dark:bg-[#0f1724] dark:text-white p-6 shadow-2xl max-h-[calc(100vh-2rem)] overflow-y-auto
+        w-full ${large ? "max-w-4xl overflow-x-auto" : "max-w-xl"} rounded-2xl bg-white dark:bg-[#0f1724] dark:text-white p-6 shadow-2xl max-h-[calc(100vh-2rem)] overflow-y-auto
         modal-open
         ${className}
         `}
