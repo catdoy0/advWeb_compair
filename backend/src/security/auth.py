@@ -1,48 +1,61 @@
-from dataclasses import dataclass
-
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, Response
 from jwt import PyJWTError
 
-from src.models.enums import UserRole
+from src.config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
+from src.models.users import UserRole
 from src.security.tokens import decode_access_token
+from src.services.auth import refresh_session
+
+ACCESS_MAX_AGE = ACCESS_TOKEN_EXPIRE_MINUTES * 60
+REFRESH_MAX_AGE = REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
 
 
-@dataclass(frozen=True)
-class AccessPrincipal:
-    user_id: int
-    first_name: str | None
-    last_name: str | None
-    email: str
-    role: UserRole
+def check_user_role(
+    request: Request,
+    response: Response,
+    allowed_roles: list[UserRole],
+) -> bool:
 
+    access_token = request.cookies.get("access_token")
 
-def get_current_user(request: Request) -> AccessPrincipal:
-    """Authenticate from the access cookie without a database query."""
-    token = request.cookies.get("access_token")
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+    if access_token:
+        try:
+            claims = decode_access_token(access_token)
+            role = UserRole(claims["role"])
+
+            return role in allowed_roles
+
+        except (PyJWTError, KeyError, TypeError, ValueError):
+            pass
+
+    refresh_token = request.cookies.get("refresh_token")
+
+    if not refresh_token:
+        return False
 
     try:
-        claims = decode_access_token(token)
-        return AccessPrincipal(
-            user_id=int(claims["sub"]),
-            first_name=claims.get("first_name"),
-            last_name=claims.get("last_name"),
-            email=claims["email"],
-            role=UserRole(claims["role"]),
-        )
-    except (PyJWTError, KeyError, TypeError, ValueError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired access token",
-        ) from None
+        user, new_access_token = refresh_session(refresh_token)
+    except HTTPException:
+        return False
 
+    response.set_cookie(
+        "access_token",
+        new_access_token,
+        max_age=ACCESS_MAX_AGE,
+        path="/",
+        httponly=True,
+        secure=False,
+        samesite="lax",
+    )
 
-def require_roles(*roles: UserRole):
-    """Use as Depends(require_roles(UserRole.ADMIN, ...)) on protected routes."""
-    def check_role(principal: AccessPrincipal = Depends(get_current_user)) -> AccessPrincipal:
-        if principal.role not in roles:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
-        return principal
+    response.set_cookie(
+        "refresh_token",
+        refresh_token,
+        max_age=REFRESH_MAX_AGE,
+        path="/auth",
+        httponly=True,
+        secure=False,
+        samesite="lax",
+    )
 
-    return check_role
+    return user.role in allowed_roles

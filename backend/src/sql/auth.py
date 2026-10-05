@@ -82,3 +82,10 @@ def delete_expired_refresh() -> None:
         )
 
         s.commit()
+
+def update_last_sign_in(user_id: int) -> None:
+    with Session(engine) as s:
+        user = s.get(Users, user_id)
+        if user:
+            user.last_sign_in = datetime.now(timezone.utc)
+            s.commit()

@@ -51,6 +51,10 @@ def signup_user(data: SignUpRequest) -> tuple[Users, str, str]:
     )
     user = auth_sql.add_user(user)
     auth_sql.delete_expired_refresh()
+
+    if user.id:
+        auth_sql.update_last_sign_in(user.id)
+
     access_token, refresh_token = _issue_token_pair(user)
     return user, access_token, refresh_token
 
@@ -66,6 +70,10 @@ def signin_user(data: LoginRequest) -> tuple[Users, str, str]:
         raise HTTPException(status_code=403, detail="Account is disabled")
 
     auth_sql.delete_expired_refresh()
+
+    if user.id:
+        auth_sql.update_last_sign_in(user.id)
+
     access_token, refresh_token = _issue_token_pair(user)
     return user, access_token, refresh_token
 
