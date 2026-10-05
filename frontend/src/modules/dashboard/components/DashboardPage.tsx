@@ -10,12 +10,12 @@ interface DashboardPageProps {
 export default function DashboardPage({
   children,
   maxWidth = "1240px",
-  className = "dark:bg-[#0f1724]",
+  className = "bg-[#f7f9fc] dark:bg-[#0f1724]",
 }: DashboardPageProps) {
   const widthClass = maxWidth === "1180px" ? "max-w-[1180px]" : "max-w-[1240px]";
 
   return (
-    <main className={`flex-1 ${className}`}>
+    <main className={`min-h-full ${className}`}>
       <div className={`mx-auto ${widthClass} p-5 lg:p-7`}>
         {children}
       </div>

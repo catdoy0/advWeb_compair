@@ -1,61 +1,118 @@
 import {
-    Archive,
+  Archive,
+  BarChart3,
   CalendarDays,
   LayoutDashboard,
   MessageCircle,
   Monitor,
+  Package,
   Settings,
   ShieldCheck,
+  ShoppingCart,
+  UserCog,
   UserRound,
-} from "lucide-react"
+  Users,
+  UsersRound,
+  Wrench,
+} from "lucide-react";
 
-import type { DashboardSidebarSection } from "../../components/common/layout/CommonDashboardSidebar"
-import type { Role } from "../../types/auth"
+import type { DashboardSidebarSection } from "../../components/common/layout/CommonDashboardSidebar";
+import type { Role } from "../../types/auth";
+import { ROUTES } from "../../routes";
+
+const D = ROUTES.DASHBOARD;
+const dashboardPath = (path: string) => `${D.ROOT}/${path}`;
+
+/* -------------------------------------------------------------------------- */
+/*                                  Nav items                                 */
+/* -------------------------------------------------------------------------- */
+
+const overviewItem = { label: "Overview", href: D.ROOT, icon: LayoutDashboard };
+const messagesItem = { label: "Messages", href: dashboardPath(D.MESSAGES), icon: MessageCircle };
+const appointmentsItem = { label: "Appointments", href: dashboardPath(D.APPOINTMENTS), icon: CalendarDays };
+const myDevicesItem = { label: "My Devices", href: dashboardPath(D.MY_DEVICES), icon: Monitor };
+const profileItem = { label: "Profile", href: dashboardPath(D.PROFILE), icon: UserRound };
+const administrationItem = { label: "Administration", href: dashboardPath(D.ADMINISTRATION), icon: ShieldCheck };
+const settingsItem = { label: "Settings", href: dashboardPath(D.SETTINGS), icon: Settings };
+const archiveItem = { label: "Archive", href: dashboardPath(D.ARCHIVE), icon: Archive };
+
+const workspaceItem = { label: "Workspace", href: dashboardPath(D.WORKSPACE), icon: LayoutDashboard };
+const repairQueueItem = { label: "Repair Queue", href: dashboardPath(D.REPAIR_QUEUE), icon: Wrench };
+const partsInventoryItem = { label: "Parts Inventory", href: dashboardPath(D.PARTS_INVENTORY), icon: Package };
+const posItem = { label: "POS", href: dashboardPath(D.POS), icon: ShoppingCart };
+const customersItem = { label: "Customers", href: dashboardPath(D.CUSTOMERS), icon: Users };
+const devicesItem = { label: "Devices", href: dashboardPath(D.DEVICES), icon: Monitor };
+const techniciansItem = { label: "Technicians", href: dashboardPath(D.TECHNICIANS), icon: UserCog };
+const staffItem = { label: "Staff", href: dashboardPath(D.STAFF), icon: UsersRound };
+const reportsItem = { label: "Reports", href: dashboardPath(D.REPORTS), icon: BarChart3 };
+
+/* -------------------------------------------------------------------------- */
+/*                              Sections per role                             */
+/* -------------------------------------------------------------------------- */
+
+const defaultSections: DashboardSidebarSection[] = [];
 
 const customerSections: DashboardSidebarSection[] = [
+  { label: "Main", items: [overviewItem, messagesItem, appointmentsItem, myDevicesItem] },
+  { label: "Manage", items: [profileItem] },
+];
+
+const technicianSections: DashboardSidebarSection[] = [
   {
-    label: "Main",
+    label: "Workspace",
+    items: [workspaceItem, repairQueueItem, messagesItem, appointmentsItem, partsInventoryItem],
+  },
+  { label: "Manage", items: [profileItem] },
+];
+
+const staffSections: DashboardSidebarSection[] = [
+  {
+    label: "Workspace",
+    items: [repairQueueItem, messagesItem, posItem, appointmentsItem],
+  },
+  { label: "Manage", items: [profileItem] },
+];
+
+const adminSections: DashboardSidebarSection[] = [
+  {
+    label: "Workspace",
     items: [
-      { label: "Overview", href: "?type=overview", icon: LayoutDashboard },
-      { label: "Messages", href: "?type=messages", icon: MessageCircle },
-      { label: "Appointments", href: "?type=appointments", icon: CalendarDays },
-      { label: "My Devices", href: "?type=mydevices", icon: Monitor },
+      overviewItem,
+      repairQueueItem,
+      messagesItem,
+      posItem,
+      appointmentsItem,
+      customersItem,
+      devicesItem,
+      partsInventoryItem,
     ],
   },
   {
     label: "Manage",
-    items: [{ label: "Profile", href: "?type=profile", icon: UserRound }],
+    items: [techniciansItem, staffItem, reportsItem, settingsItem, profileItem],
   },
-]
-
+];
 
 const superAdminSections: DashboardSidebarSection[] = [
-  {
-    label: "Main",
-    items: [
-      { label: "Adminstration", href: "?type=adminstration", icon: ShieldCheck },
-      { label: "Settings", href: "?type=settings", icon: Settings },
-      { label: "Profile", href: "?type=profile", icon: UserRound },
-    ],
-  },
-  {
-    label: "System",
-    items: [{ label: "Archive", href: "?type=archive", icon: Archive}],
-  },
-]
+  { label: "Manage", items: [administrationItem, settingsItem, profileItem] },
+  { label: "System", items: [archiveItem] },
+];
 
-/**
- * One nav config per role. Customer is the real one; everyone else is
- * temporarily pointed at the same sections just so the app doesn't crash
- * for those roles — replace each with real nav items once we know what
- * Technician/Staff/Admin/Super Admin should actually see.
- *
- * tldr: for rbac
- */
+/** Navigation items for each project role. Roles without a defined menu use the empty default. */
 export const dashboardSectionsByRole: Record<Role, DashboardSidebarSection[]> = {
   CUSTOMER: customerSections,
-  TECHNICIAN: customerSections, // TODO
-  STAFF: customerSections, // TODO
-  ADMIN: customerSections, // TODO
+  TECHNICIAN: technicianSections,
+  STAFF: staffSections,
+  ADMIN: adminSections, // Manager / Owner
   SUPER_ADMIN: superAdminSections,
+};
+
+/** Resolve a dashboard path to its label for the header breadcrumb. */
+export function getNavLabel(role: Role, pathname: string): string {
+  for (const section of dashboardSectionsByRole[role]) {
+    const item = section.items.find((entry) => entry.href === pathname);
+    if (item) return item.label;
+  }
+
+  return pathname === D.ROOT ? "Overview" : "Dashboard";
 }

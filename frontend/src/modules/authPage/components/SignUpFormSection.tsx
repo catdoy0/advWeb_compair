@@ -62,7 +62,7 @@ export default function SignInFormSection() {
         return;
       }
 
-      navigate(ROUTES.DASHBOARD);
+      navigate(ROUTES.DASHBOARD.ROOT);
     } catch {
       setError("Unable to create account. Please try again.");
     } finally {

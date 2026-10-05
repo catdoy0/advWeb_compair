@@ -1,7 +1,7 @@
 export default function SettingsDashboard() {
   return (
     <>
-      todo:
+      todo: settings
     </>
   )
 }

@@ -18,6 +18,30 @@ html {
   scroll-behavior: smooth;
 }
 
+*::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 9999px !important;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.scroll-hidden::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.scroll-hidden:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
 
 @theme {
 }

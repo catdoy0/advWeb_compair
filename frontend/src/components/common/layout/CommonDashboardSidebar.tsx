@@ -20,7 +20,6 @@ interface CommonDashboardSidebarProps {
   sections: DashboardSidebarSection[]
   activeHref?: string
 
-
   user?: {
     initials: string
     name: string
@@ -39,29 +38,26 @@ export default function CommonDashboardSidebar({
     <aside
       className="
         flex
-        min-h-screen
+        h-full
         w-56
         shrink-0
         flex-col
+        overflow-hidden
         bg-[#0b213d]
       "
     >
       {/* Header */}
-      <div className="flex h-24 items-center px-6">
+      <div className="flex h-24 shrink-0 items-center px-6">
         <div className="min-w-0 flex-1">
-
-          <div className="flex flex-row gap-2 items-center">
-            <Logo size={32} variant="default"/>
-
+          <div className="flex flex-row items-center gap-2">
+            <Logo size={32} variant="default" />
             <div>
               <p className="text-[15px] font-bold tracking-[0.2em] text-white">
                 COMPAIR
               </p>
-
               <p className="mt-1 text-[9px] tracking-wide text-slate-400">
                 Computer repair
               </p>
-
               <p className="text-[9px] tracking-wide text-slate-400">
                 operations
               </p>
@@ -69,21 +65,15 @@ export default function CommonDashboardSidebar({
           </div>
         </div>
 
-        <CommonButton
-          variant="icon"
-          aria-label="Collapse sidebar"
-        >
+        <CommonButton variant="icon" aria-label="Collapse sidebar">
           <ChevronLeft size={16} />
         </CommonButton>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4">
+      <nav className="flex-1 overflow-y-auto px-4">
         {sections.map((section) => (
-          <div
-            key={section.label}
-            className="mb-7"
-          >
+          <div key={section.label} className="mb-7">
             <p
               className="
                 mb-2
@@ -136,10 +126,7 @@ export default function CommonDashboardSidebar({
                     `}
                   >
                     <Icon size={15} strokeWidth={1.8} />
-
-                    <span>
-                      {item.label}
-                    </span>
+                    <span>{item.label}</span>
                   </Link>
                 )
               })}
@@ -150,7 +137,7 @@ export default function CommonDashboardSidebar({
 
       {/* User */}
       {user && (
-        <div className="border-t border-[#1c3552] p-4">
+        <div className="shrink-0 border-t border-[#1c3552] p-4">
           <div className="flex items-center gap-3">
             <UserAvatar initials={user.initials} tone="sidebar" />
 

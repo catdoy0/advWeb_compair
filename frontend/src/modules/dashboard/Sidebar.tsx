@@ -4,7 +4,7 @@ import type { Role } from "../../types/auth"
 
 interface DashboardSidebarProps {
   role: Role
-  activeType: string
+  activeHref: string
   userInitials: string
   userName: string
   onLogout: () => void
@@ -12,7 +12,7 @@ interface DashboardSidebarProps {
 
 export default function DashboardSidebar({
   role,
-  activeType,
+  activeHref,
   userInitials,
   userName,
   onLogout,
@@ -20,7 +20,7 @@ export default function DashboardSidebar({
   return (
     <CommonDashboardSidebar
       sections={dashboardSectionsByRole[role]}
-      activeHref={`?type=${activeType}`}
+      activeHref={activeHref}
       user={{
         initials: userInitials,
         name: userName,
