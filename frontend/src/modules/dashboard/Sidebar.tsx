@@ -7,6 +7,8 @@ interface DashboardSidebarProps {
   activeHref: string
   userInitials: string
   userName: string
+  open: boolean;
+  onClose: () => void;
   onLogout: () => void
 }
 
@@ -15,6 +17,8 @@ export default function DashboardSidebar({
   activeHref,
   userInitials,
   userName,
+  onClose,
+  open,
   onLogout,
 }: DashboardSidebarProps) {
   return (
@@ -25,6 +29,8 @@ export default function DashboardSidebar({
         initials: userInitials,
         name: userName,
       }}
+      open={open}
+      onClose={onClose}
       onLogout={onLogout}
     />
   )

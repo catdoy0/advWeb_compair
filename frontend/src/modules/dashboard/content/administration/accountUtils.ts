@@ -1,4 +1,4 @@
-import type { GetUsers } from "../../../../types/administration";
+import type { GetUser } from "../../../../types/administration";
 import type { Account, AccountRole } from "./types";
 
 const ROLE_LABEL: Record<string, AccountRole> = {
@@ -20,7 +20,7 @@ function formatLastSignIn(iso: string | null | undefined): string {
   return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function toAccount(user: GetUsers): Account {
+export function toAccount(user: GetUser): Account {
   return {
     id: `USR-${String(user.id).padStart(3, "0")}`,
     name: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email,
@@ -28,5 +28,6 @@ export function toAccount(user: GetUsers): Account {
     role: ROLE_LABEL[user.role] ?? "Customer",
     status: user.is_active ? "Active" : "Suspended",
     lastSignIn: formatLastSignIn(user.last_sign_in),
+    raw: user,
   };
 }

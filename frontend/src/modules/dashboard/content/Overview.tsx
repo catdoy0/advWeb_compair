@@ -1,7 +1,10 @@
 import { useAuth } from "../../../context/AuthContext";
-import CustomerOverview from "./customer/CustomerOverview";
+import CustomerOverview from "./Overview/CustomerOverview";
 
 import { dummySession } from "../../../dummyData";
+import TechnicianOverview from "./Overview/TechnicianOverview";
+import StaffOverview from "./Overview/StaffOverview";
+import AdminOverview from "./Overview/AdminOverview";
 
 
 

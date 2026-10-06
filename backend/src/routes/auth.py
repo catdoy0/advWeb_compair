@@ -36,7 +36,7 @@ def _set_access_cookie(response: Response, access_token: str) -> None:
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     response.set_cookie(
         "refresh_token", refresh_token,
-        max_age=REFRESH_MAX_AGE, path="/auth", **COOKIE_OPTIONS,
+        max_age=REFRESH_MAX_AGE, path="/", **COOKIE_OPTIONS,
     )
 
 
@@ -62,18 +62,15 @@ def signin(data: LoginRequest, response: Response):
 @router.post("/session")
 def check_session(response: Response, request: Request):
     access_token = request.cookies.get("access_token")
+
     if access_token:
         try:
             claims = decode_access_token(access_token)
-            return {
-                "user": {
-                    "id": int(claims["sub"]),
-                    "email": claims["email"],
-                    "firstName": claims["first_name"],
-                    "lastName": claims["last_name"],
-                    "role": claims["role"],
-                }
-            }
+            user_id = int(claims["sub"])
+            user = auth_sql.get_user_by_id(user_id)
+
+            if user is not None and user.role.value == claims["role"]:
+                return {"user": serialize_user(user)}
         except (PyJWTError, KeyError, TypeError, ValueError):
             pass
 
@@ -91,7 +88,7 @@ def check_session(response: Response, request: Request):
 def logout(response: Response, request: Request):
     revoke_refresh_token(request.cookies.get("refresh_token"))
     response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/auth")
+    response.delete_cookie("refresh_token", path="/")
     return {"message": "Logged out"}
 
 

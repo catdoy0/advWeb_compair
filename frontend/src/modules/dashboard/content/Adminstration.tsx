@@ -10,23 +10,28 @@ import DashboardPage from "../components/DashboardPage";
 import DashboardPanel from "../components/DashboardPanel";
 
 import { getUsers, getTotalUsers, setUserActive } from "../../../api/administration";
-import type { TotalUsers } from "../../../types/administration";
+import type { GetUser, TotalUsers } from "../../../types/administration";
 import AreYouSureModal from "../../../components/common/modals/AreYouSureModal";
 import AccountActions from "./administration/AccountActions";
 import AccountFilterButton from "./administration/AccountFilterButton";
 import SummaryCard from "./administration/SummaryCard";
 import { toAccount } from "./administration/accountUtils";
 import type { Account, AccountFilter } from "./administration/types";
+import EditAccountModal from "./administration/EditAccountModal";
 
 export default function Adminstration() {
   const [suspendModalOpen, setSuspendModalOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<GetUser | null>(null);
 
   const [activeFilter, setActiveFilter] =
     useState<AccountFilter>("All accounts");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [totals, setTotals] = useState<TotalUsers | null>(null);
   const [loading, setLoading] = useState(true);
+
 
 
   const accountColumns: DataTableColumn<Account>[] = [
@@ -49,7 +54,13 @@ export default function Adminstration() {
       key: "status",
       label: "Status",
       render: (account) => (
-        <span className="inline-flex rounded bg-[#e6f5ef] px-2 py-1 text-[9px] font-bold text-[#15946a]">
+        <span
+          className={`inline-flex rounded px-2 py-1 text-[9px] font-bold ${
+account.status === "Active"
+? "bg-[#e6f5ef] text-[#15946a]"
+: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+}`}
+        >
           {account.status}
         </span>
       ),
@@ -61,6 +72,10 @@ export default function Adminstration() {
       render: (account) => (
         <AccountActions
           account={account}
+          onEdit={(a) => {
+            setSelectedUser(a.raw);
+            setEditModalOpen(true);
+          }}
           onSuspend={(a) => {
             setSelectedAccount(a);
             setSuspendModalOpen(true);
@@ -116,21 +131,49 @@ export default function Adminstration() {
         onConfirm={async () => {
           if (!selectedAccount) return;
 
-          const rawId = Number(selectedAccount.id.replace("USR-", ""));
-
-          await setUserActive(rawId, false);
+          const nextActive = selectedAccount.raw.is_active === false; // true if currently suspended → unsuspend
+          await setUserActive(selectedAccount.raw.id, nextActive);
 
           setAccounts((prev) =>
             prev.map((a) =>
-              a.id === selectedAccount.id ? { ...a, status: "Suspended" } : a,
+              a.raw.id === selectedAccount.raw.id
+                ? {
+                  ...a,
+                  status: nextActive ? "Active" : "Suspended",
+                  raw: { ...a.raw, is_active: nextActive },
+                }
+                : a,
             ),
           );
 
           setSuspendModalOpen(false);
           setSelectedAccount(null);
         }}
-        header={`Suspend ${selectedAccount?.name ?? ""}`}
-        description="They will no longer be able to sign in until access is restored."
+        header={
+          selectedAccount?.raw.is_active === false
+            ? `Unsuspend ${selectedAccount?.name ?? ""}`
+            : `Suspend ${selectedAccount?.name ?? ""}`
+        }
+        description={
+          selectedAccount?.raw.is_active === false
+            ? "They will be able to sign in again once access is restored."
+            : "They will no longer be able to sign in until access is restored."
+        }
+      />
+
+      <EditAccountModal
+        key={selectedUser?.id ?? "none"}
+        open={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false);
+          setSelectedUser(null);
+        }}
+        user={selectedUser}
+        onUpdated={() => {
+          getUsers(10, 1, "").then((res) => {
+            if (res) setAccounts(res.map(toAccount));
+          });
+        }}
       />
 
       {/* Header */}
@@ -210,12 +253,12 @@ export default function Adminstration() {
             Loading accounts…
           </div>
         ) : (
-          <DataTable
-            columns={accountColumns}
-            data={filteredAccounts}
-            emptyMessage="No accounts found for this role."
-          />
-        )}
+            <DataTable
+              columns={accountColumns}
+              data={filteredAccounts}
+              emptyMessage="No accounts found for this role."
+            />
+          )}
       </DashboardPanel>
 
       {/* Backups */}

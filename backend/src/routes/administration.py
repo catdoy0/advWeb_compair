@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
 
 from src.models.users import UserRole
+from src.schemas.administration import GetUsers
 from src.security.auth import check_user_role
 from src.sql import administration as admin_sql
 
@@ -51,3 +53,44 @@ def set_user_active(
         )
 
     return admin_sql.set_user_active(user_id, is_active)
+
+
+@router.post("/edit-user")
+def edit_user(
+    request: Request,
+    response: Response,
+    user: GetUsers
+):
+    if not check_user_role(request, response, [UserRole.SUPER_ADMIN]):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to access this resource",
+        )
+
+
+    if not admin_sql.edit_user(user):
+        raise HTTPException(
+            status_code=400,
+            detail="failed to edit user",
+        )
+    return "ok"
+
+
+@router.post("/reset-user-password")
+def reset_user_pasword(
+    request: Request,
+    response: Response,
+    user_id: int
+):
+    if not check_user_role(request, response, [UserRole.SUPER_ADMIN]):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to access this resource",
+        )
+
+
+    raw_password = admin_sql.reset_user_password(user_id)
+    if not raw_password:
+        raise HTTPException( status_code=400, detail="Failed to reset password")
+    return raw_password
+

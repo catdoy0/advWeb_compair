@@ -6,12 +6,14 @@ import { dashboardSectionsByRole } from "../../modules/dashboard/DashboardNav";
 import { ROUTES } from "../../routes";
 
 export default function RoleGuard({ children }: { children: ReactNode }) {
-  const { session } = useAuth();
+  const { session, loading } = useAuth();
   const { pathname } = useLocation();
 
-  if (!session) return <Navigate to={ROUTES.AUTHPAGE} replace />;
+  if (loading) return null;
 
-  const allowedPaths = dashboardSectionsByRole[session.user.role]
+  const role = session?.user?.role ?? "CUSTOMER";
+
+  const allowedPaths = dashboardSectionsByRole[role]
     .flatMap((section) => section.items.map((item) => item.href))
     .filter(Boolean);
 

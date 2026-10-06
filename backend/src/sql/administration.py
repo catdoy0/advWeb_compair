@@ -1,9 +1,15 @@
+import secrets
+import string
+from datetime import datetime, timezone
+
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, func, select, text
 
 from src.database import engine
+from src.models.enums import UserRole
 from src.models.users import Users
 from src.schemas.administration import GetUsers
+from src.security.passwords import hash_password
 
 
 # def get_users(
@@ -106,3 +112,42 @@ def set_user_active(user_id: int, is_active: bool) -> bool:
     except SQLAlchemyError as e:
         print(f"set_user_active failed: {e}")
         return False
+
+def edit_user(user: GetUsers) -> bool:
+    try:
+        with Session(engine) as s:
+            db_user = s.get(Users, user.id)
+            if not db_user:
+                return False
+
+            db_user.first_name = user.first_name
+            db_user.last_name = user.last_name
+            db_user.email = user.email
+            db_user.role = UserRole(user.role)
+            db_user.updated_at = datetime.now(timezone.utc)
+
+            s.commit()
+        return True
+    except SQLAlchemyError as e:
+        print(f"edit_user failed: {e}")
+        return False
+
+
+def reset_user_password(user_id: int) -> str:
+    try:
+        with Session(engine) as s:
+            user = s.get(Users, user_id)
+            if not user:
+                return ""
+
+            alphabet = string.ascii_letters + string.digits
+            raw_password = "".join(secrets.choice(alphabet) for _ in range(8))
+
+            user.password_hash = hash_password(raw_password)
+            user.updated_at = datetime.now(timezone.utc)
+            s.commit()
+
+            return raw_password
+    except SQLAlchemyError as e:
+        print(f"reset_user_password failed: {e}")
+        return ""

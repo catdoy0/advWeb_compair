@@ -1,3 +1,5 @@
+import type { GetUser } from "../../../../types/administration";
+
 export type AccountRole = "Customer" | "Technician" | "Staff" | "Administrator";
 
 export interface Account {
@@ -7,6 +9,7 @@ export interface Account {
   role: AccountRole;
   status: "Active" | "Suspended";
   lastSignIn: string;
+  raw: GetUser;
 }
 
 export type AccountFilter = "All accounts" | AccountRole;

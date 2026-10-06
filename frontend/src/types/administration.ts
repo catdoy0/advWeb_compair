@@ -1,11 +1,11 @@
-export interface GetUsers {
+export interface GetUser {
   id: number;
   first_name?: string;
   last_name?: string;
   email: string;
   role: string;
   is_active: boolean;
-  last_sign_in: string;
+  last_sign_in?: string;
 }
 
 export interface TotalUsers {

@@ -10,6 +10,7 @@ import { getNavLabel } from "../modules/dashboard/DashboardNav";
 
 export default function DashboardPage() {
   const [isAreYouSureModalOpen, setIsAreYouSureModalOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { session, logout } = useAuth();
   const { pathname } = useLocation();
@@ -41,6 +42,8 @@ export default function DashboardPage() {
           userInitials={initials}
           userName={fullName}
           onLogout={() => setIsAreYouSureModalOpen(true)}
+          onClose={() => setSidebarOpen(false)}
+          open={sidebarOpen}
         />
 
         {/* Right column: header stays, only content scrolls */}
@@ -49,6 +52,7 @@ export default function DashboardPage() {
             breadcrumbs={["Compair", contentLabel]}
             statusLabel="Live workspace"
             userInitials={initials}
+            onMenuClick={() => setSidebarOpen(true)}
           />
 
           <main className="min-h-0 flex-1 overflow-y-auto bg-[#f7f9fc] dark:bg-[#0f1724]">
