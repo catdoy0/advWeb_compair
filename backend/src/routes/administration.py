@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query, Request, Response
-from fastapi.responses import JSONResponse
 
 from src.models.users import UserRole
 from src.schemas.administration import GetUsers
 from src.security.auth import check_user_role
+from src.services.administration import get_current_user_id
 from src.sql import administration as admin_sql
 
 router = APIRouter()
@@ -17,7 +17,8 @@ def get_users(
     response: Response,
     page: int = Query(1, ge=1),
     how_many: int = Query(10, ge=1, le=30),
-    search: str = Query("")
+    search: str = Query(""),
+    role: str = Query("")
 ):
     if not check_user_role(request, response, AUTHORIZED_ROLE):
         raise HTTPException(
@@ -25,7 +26,7 @@ def get_users(
             detail="You do not have permission to access this resource",
         )
 
-    return admin_sql.get_users(how_many, page, search)
+    return admin_sql.get_users(how_many, page, search, role)
 
 
 @router.get("/get-total-users")
@@ -52,6 +53,32 @@ def set_user_active(
             detail="You do not have permission to access this resource",
         )
 
+    current_user_id = get_current_user_id(request)
+
+    # Can't suspend yourself
+    if current_user_id == user_id and is_active is False:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot suspend your own account",
+        )
+
+    state = admin_sql.get_user_state(user_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target_role, target_is_active = state
+
+    # Only block if: target is an active super admin AND we're suspending
+    # AND they're the only active super admin left
+    suspending = is_active is False
+    target_is_active_super = target_role == "SUPER_ADMIN" and target_is_active is True
+
+    if ( suspending and target_is_active_super ) and ( admin_sql.count_active_super_admins() <= 1):
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot suspend the last remaining active super admin",
+            )
+
     return admin_sql.set_user_active(user_id, is_active)
 
 
@@ -67,6 +94,29 @@ def edit_user(
             detail="You do not have permission to access this resource",
         )
 
+    current_user_id = get_current_user_id(request)
+
+    if current_user_id == user.id:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot change your own role",
+        )
+
+    state = admin_sql.get_user_state(user.id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target_role, target_is_active = state
+
+    demoting = target_role == "SUPER_ADMIN" and user.role != "SUPER_ADMIN"
+
+    if demoting and target_is_active:
+        active_super_admins = admin_sql.count_active_super_admins()
+        if active_super_admins <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot demote the last remaining active super admin",
+            )
 
     if not admin_sql.edit_user(user):
         raise HTTPException(

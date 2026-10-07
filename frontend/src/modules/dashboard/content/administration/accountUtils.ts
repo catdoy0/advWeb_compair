@@ -6,7 +6,7 @@ const ROLE_LABEL: Record<string, AccountRole> = {
   TECHNICIAN: "Technician",
   STAFF: "Staff",
   ADMIN: "Administrator",
-  SUPER_ADMIN: "Administrator",
+  SUPER_ADMIN: "Super Admin",
 };
 
 function formatLastSignIn(iso: string | null | undefined): string {

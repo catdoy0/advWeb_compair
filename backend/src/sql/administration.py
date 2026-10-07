@@ -42,7 +42,7 @@ from src.security.passwords import hash_password
 #         ).all()
 #
 #         return list(rows), total
-def get_users(how_many: int = 10, page: int = 1, search: str = "") -> list[GetUsers]:
+def get_users(how_many: int = 10, page: int = 1, search: str = "", role: str = "") -> list[GetUsers]:
     """
     raw dog sql
     """
@@ -51,21 +51,52 @@ def get_users(how_many: int = 10, page: int = 1, search: str = "") -> list[GetUs
     page = max(1, page)
     
     db_offset = (page - 1) * how_many
+    role = role.strip()
+    search = search.strip()
+
     try:
         with Session(engine) as s:
-            sql = text("""
-                SELECT * FROM users
-                WHERE (first_name LIKE :search OR last_name LIKE :search OR email LIKE :search)
-                ORDER BY id
-                LIMIT :limit OFFSET :offset
-            """)
-            result = s.execute(sql, {
-                "search": f"%{search}%",
-                "limit": how_many,
-                "offset": db_offset,
-            }).mappings()
+            if role == "ADMIN":
+                sql = text("""
+                    SELECT * FROM users
+                    WHERE (first_name ILIKE :search OR last_name ILIKE :search OR email ILIKE :search)
+                    AND role IN ('ADMIN', 'SUPER_ADMIN')
+                    ORDER BY id
+                    LIMIT :limit OFFSET :offset
+                """)
+                params = {
+                    "search": f"%{search}%",
+                    "limit": how_many,
+                    "offset": db_offset,
+                }
+            elif role:
+                sql = text("""
+                    SELECT * FROM users
+                    WHERE (first_name ILIKE :search OR last_name ILIKE :search OR email ILIKE :search)
+                    AND role = CAST(:role AS userrole)
+                    ORDER BY id
+                    LIMIT :limit OFFSET :offset
+                """)
+                params = {
+                    "search": f"%{search}%",
+                    "role": role,
+                    "limit": how_many,
+                    "offset": db_offset,
+                }
+            else:
+                sql = text("""
+                    SELECT * FROM users
+                    WHERE (first_name ILIKE :search OR last_name ILIKE :search OR email ILIKE :search)
+                    ORDER BY id
+                    LIMIT :limit OFFSET :offset
+                """)
+                params = {
+                    "search": f"%{search}%",
+                    "limit": how_many,
+                    "offset": db_offset,
+                }
 
-            rows = result.all()
+            rows = s.execute(sql, params).mappings().all()
             # result_list = []
             # for row in rows:
             #     result_list.append({
@@ -131,6 +162,31 @@ def edit_user(user: GetUsers) -> bool:
     except SQLAlchemyError as e:
         print(f"edit_user failed: {e}")
         return False
+
+def get_user_role(user_id: int) -> str | None:
+    with Session(engine) as s:
+        user = s.get(Users, user_id)
+        if not user:
+            return None
+        return user.role.value
+
+
+def count_active_super_admins() -> int:
+    with Session(engine) as s:
+        return s.exec(
+            select(func.count())
+            .select_from(Users)
+            .where(Users.role == UserRole.SUPER_ADMIN)
+            .where(Users.is_active == True)
+        ).one()
+
+
+def get_user_state(user_id: int) -> tuple[str, bool] | None:
+    with Session(engine) as s:
+        user = s.get(Users, user_id)
+        if not user:
+            return None
+        return user.role.value, user.is_active
 
 
 def reset_user_password(user_id: int) -> str:

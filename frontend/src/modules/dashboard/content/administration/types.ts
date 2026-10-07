@@ -1,6 +1,6 @@
 import type { GetUser } from "../../../../types/administration";
 
-export type AccountRole = "Customer" | "Technician" | "Staff" | "Administrator";
+export type AccountRole = "Customer" | "Technician" | "Staff" | "Administrator" | "Super Admin";
 
 export interface Account {
   id: string;

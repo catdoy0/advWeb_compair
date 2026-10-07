@@ -96,6 +96,7 @@ def refresh_session(raw_token: str | None) -> tuple[Users, str]:
         raise HTTPException(status_code=401, detail="Account is unavailable")
 
     auth_sql.update_refresh_expiry(row.id, refresh_expiry())
+    auth_sql.update_last_sign_in(row.user_id)
     access_token = create_access_token(user)
     return user, access_token
 

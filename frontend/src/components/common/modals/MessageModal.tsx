@@ -7,7 +7,6 @@ interface AreYouSureModalProps {
   header?: string;
   title?: string;
   description?: string;
-  confirmLabel?: string;
   cancelLabel?: string;
 }
 

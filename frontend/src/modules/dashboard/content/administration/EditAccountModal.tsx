@@ -4,10 +4,7 @@ import { KeyRound, Save, ShieldCheck, ShieldOff } from "lucide-react";
 import Modal from "../../../../components/common/modals/Modal";
 import CommonButton from "../../../../components/common/widgets/CommonButton";
 import type { GetUser } from "../../../../types/administration";
-import {
-  editUser,
-  setUserActive,
-} from "../../../../api/administration";
+import { editUser, setUserActive } from "../../../../api/administration";
 import MessageModal from "../../../../components/common/modals/MessageModal";
 
 const inputClass =
@@ -67,15 +64,18 @@ function EditAccountForm({
     role: user.role,
   });
 
-  const [messageModal, setMessageModal] = useState(false);
+  const [isActive, setIsActive] = useState(user.is_active);
+
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
+  const [messageModalMessage, setMessageModalMessage] = useState("");
 
   const fullName = [firstName, lastName].filter(Boolean).join(" ") || email;
 
   const dirty =
     firstName !== baseline.firstName ||
-      lastName !== baseline.lastName ||
-      email !== baseline.email ||
-      role !== baseline.role;
+    lastName !== baseline.lastName ||
+    email !== baseline.email ||
+    role !== baseline.role;
 
   const handleSave = async () => {
     if (!dirty) return;
@@ -86,34 +86,44 @@ function EditAccountForm({
       last_name: lastName,
       email: email,
       role: role,
-      is_active: user.is_active,
+      is_active: isActive,
       last_sign_in: user.last_sign_in,
     };
 
-    const ok = await editUser(updated);
-    if (!ok) return;
+    const result = await editUser(updated);
+
+    setMessageModalMessage(result.message);
+    setMessageModalOpen(true);
+
+    if (!result.ok) return;
 
     onUpdated();
     setBaseline({ firstName, lastName, email, role });
-    setMessageModal(true)
-    // onClose();
   };
 
   const handleToggleActive = async () => {
-    const ok = await setUserActive(user.id, !user.is_active);
-    if (!ok) return;
+    const nextActive = !isActive;
 
+    const result = await setUserActive(user.id, nextActive);
+
+    if (!result.ok) {
+      setMessageModalMessage(result.message);
+      setMessageModalOpen(true);
+      return;
+    }
+
+    setIsActive(nextActive);
     onUpdated();
-    onClose();
   };
-
 
   return (
     <Modal open={open} onClose={onClose} large>
       <MessageModal
-        open={messageModal}
-        onClose={() => setMessageModal(false)}
+        open={messageModalOpen}
+        onClose={() => setMessageModalOpen(false)}
+        title={messageModalMessage}
       />
+
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#2870e8]">
         Account / edit
       </p>
@@ -126,14 +136,15 @@ function EditAccountForm({
 
           <span
             className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-              user.is_active
+              isActive
                 ? "bg-[#e6f5ef] text-[#15946a]"
                 : "bg-[#fdecec] text-[#c0392b]"
             }`}
           >
-            {user.is_active ? "Active" : "Suspended"}
+            {isActive ? "Active" : "Suspended"}
           </span>
         </div>
+
         <p className="mt-0.5 text-[11px] text-slate-400">
           USR-{String(user.id).padStart(3, "0")}
         </p>
@@ -202,7 +213,7 @@ function EditAccountForm({
           Reset password
         </CommonButton>
 
-        {user.is_active ? (
+        {isActive ? (
           <CommonButton
             onClick={handleToggleActive}
             className="flex items-center gap-2 bg-[#c0392b] px-4 py-2 hover:bg-[#a83226]"
