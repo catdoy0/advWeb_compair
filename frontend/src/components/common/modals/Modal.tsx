@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
+import { useEscapeKey } from "../../../hooks/useModalKeys";
 
 interface ModalProps {
   open: boolean;
@@ -34,22 +34,7 @@ export default function Modal({
   dismissable = true,
   large = false
 }: ModalProps) {
-  useEffect(() => {
-    if (!open || !dismissable) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, dismissable, onClose]);
-
+  useEscapeKey({ open, onClose, enabled: dismissable });
   if (!open) return null;
 
   return (

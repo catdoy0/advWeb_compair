@@ -1,5 +1,6 @@
 import Modal from "./Modal";
 import CommonButton from "../widgets/CommonButton";
+import { useEnterKey } from "../../../hooks/useModalKeys";
 
 interface AreYouSureModalProps {
   open: boolean;
@@ -18,6 +19,8 @@ export default function MessageModal({
   description = "",
   cancelLabel = "Okay",
 }: AreYouSureModalProps) {
+
+  useEnterKey({ open, onEnter: onClose, enabled: true  });
   return (
     <Modal open={open} onClose={onClose}>
 

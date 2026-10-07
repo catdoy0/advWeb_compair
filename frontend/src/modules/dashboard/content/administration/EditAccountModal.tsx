@@ -6,6 +6,7 @@ import CommonButton from "../../../../components/common/widgets/CommonButton";
 import type { GetUser } from "../../../../types/administration";
 import { editUser, setUserActive } from "../../../../api/administration";
 import MessageModal from "../../../../components/common/modals/MessageModal";
+import { useEnterKey } from "../../../../hooks/useModalKeys";
 
 const inputClass =
   "h-10 w-full rounded-md border border-[#cfd9e8] bg-white px-3 text-[12px] text-[#102c50] outline-none placeholder:text-slate-400 focus:border-[#2870e8] dark:border-slate-600 dark:bg-[#182536] dark:text-white";
@@ -52,6 +53,8 @@ function EditAccountForm({
   user,
   onUpdated,
 }: EditAccountModalProps & { user: GetUser }) {
+
+
   const [firstName, setFirstName] = useState(user.first_name ?? "");
   const [lastName, setLastName] = useState(user.last_name ?? "");
   const [email, setEmail] = useState(user.email);
@@ -115,6 +118,13 @@ function EditAccountForm({
     setIsActive(nextActive);
     onUpdated();
   };
+
+
+ useEnterKey({
+    open,
+    onEnter: handleSave,
+    enabled: dirty,
+  });
 
   return (
     <Modal open={open} onClose={onClose} large>

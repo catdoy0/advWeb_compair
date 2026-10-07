@@ -270,7 +270,7 @@ const totalAccounts = totals?.total_accounts ?? 0;
         contentClassName=""
       >
         {/* Search */}
-        <div className="px-5 pt-3">
+        <div className="px-5 pt-3 mb-3">
           <div className="relative">
             <Search
               size={14}
@@ -281,7 +281,7 @@ const totalAccounts = totals?.total_accounts ?? 0;
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search by first name, last name, or email"
-              className="h-10 w-full rounded-md border border-[#cfd9e8] bg-white pl-9 pr-3 text-[12px] text-[#102c50] outline-none placeholder:text-slate-400 focus:border-[#2870e8] dark:border-slate-600 dark:bg-[#182536] dark:text-white"
+              className="h-10 w-xs rounded-md border border-[#cfd9e8] bg-white pl-9 pr-3 text-[12px] text-[#102c50] outline-none placeholder:text-slate-400 focus:border-[#2870e8] dark:border-slate-600 dark:bg-[#182536] dark:text-white"
             />
           </div>
         </div>

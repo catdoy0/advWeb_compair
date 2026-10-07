@@ -5,6 +5,7 @@ from src.schemas.administration import GetUsers
 from src.security.auth import check_user_role
 from src.services.administration import get_current_user_id
 from src.sql import administration as admin_sql
+from src.sql import auth as auth_sql
 
 router = APIRouter()
 
@@ -96,17 +97,30 @@ def edit_user(
 
     current_user_id = get_current_user_id(request)
 
-    if current_user_id == user.id:
-        raise HTTPException(
-            status_code=400,
-            detail="You cannot change your own role",
-        )
+    if not user.email or not user.email.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Email cannot be empty",
+            )
+
 
     state = admin_sql.get_user_state(user.id)
     if state is None:
         raise HTTPException(status_code=404, detail="User not found")
 
     target_role, target_is_active = state
+
+    if current_user_id == user.id and user.role != target_role:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot change your own role",
+        )
+    existing = auth_sql.get_user_by_email(user.email)
+    if existing is not None and existing.id != user.id:
+        raise HTTPException(
+            status_code=409,
+            detail="Email is already registered to another account",
+        )
 
     demoting = target_role == "SUPER_ADMIN" and user.role != "SUPER_ADMIN"
 

@@ -9,6 +9,9 @@ import CommonInput from "../../../components/common/widgets/CommonInput";
 import {  checkEmailTaken } from "../../../api/auth";
 import { useAuth } from "../../../context/AuthContext";
 import { ROUTES } from "../../../routes";
+import { validateConfirmPassword, validateEmail, validateFirstName, validateLastName, validatePassword } from "./validation";
+
+
 
 export default function SignInFormSection() {
   const { signUp } = useAuth()
@@ -19,6 +22,13 @@ export default function SignInFormSection() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+
+  const [firstNameError, setFirstNameError] = useState("");
+  const [lastNameError, setLastNameError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
+
   const [error, setError] = useState("");
   const [emailTaken, setEmailTaken] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -26,19 +36,44 @@ export default function SignInFormSection() {
   const navigate = useNavigate();
 
   async function handleEmailBlur() {
-    if (!email) return;
+    const message = validateEmail(email);
+    if (message) {
+      setEmailError(message);
+      return;
+    }
+
+    setEmailError("");
+
     const taken = await checkEmailTaken(email);
     setEmailTaken(taken);
+    if (taken) setEmailError("This email is already registered.");
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
+    // run every validator and collect the results
+    const nextFirstNameError = validateFirstName(firstName);
+    const nextLastNameError = validateLastName(lastName);
+    const nextEmailError = validateEmail(email);
+    const nextPasswordError = validatePassword(password);
+    const nextConfirmPasswordError = validateConfirmPassword(password, confirmPassword);
+
+    setFirstNameError(nextFirstNameError);
+    setLastNameError(nextLastNameError);
+    setEmailError(nextEmailError);
+    setPasswordError(nextPasswordError);
+    setConfirmPasswordError(nextConfirmPasswordError);
+
+    const hasError =
+      nextFirstNameError ||
+      nextLastNameError ||
+      nextEmailError ||
+      nextPasswordError ||
+      nextConfirmPasswordError;
+
+    if (hasError) return;
 
     setSubmitting(true);
     try {
@@ -46,6 +81,7 @@ export default function SignInFormSection() {
       const taken = await checkEmailTaken(email);
       if (taken) {
         setEmailTaken(true);
+        setEmailError("This email is already registered.");
         return;
       }
 
@@ -72,8 +108,8 @@ export default function SignInFormSection() {
 
   return (
     <div className="relative flex w-full flex-col items-center justify-center bg-white px-6 py-12 transition-colors duration-300 dark:bg-[#0b1a2e] lg:w-1/2">
-      <BackButton hideOnDesktop={true} variant="absolute"/>
-      <DarkModeButton variant="absolute"/>
+      <BackButton hideOnDesktop={true} variant="absolute" />
+      <DarkModeButton variant="absolute" />
 
       <div className="w-full max-w-sm modal-open">
         <p className="text-xs font-bold tracking-widest text-[#2d65c8] dark:text-blue-400">
@@ -97,7 +133,12 @@ export default function SignInFormSection() {
               placeholder="e.g Cruz"
               required
               value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
+              onChange={(e) => {
+                setLastName(e.target.value);
+                if (lastNameError) setLastNameError("");
+              }}
+              onBlur={() => setLastNameError(validateLastName(lastName))}
+              error={lastNameError}
             />
             <CommonInput
               id="firstName"
@@ -106,7 +147,12 @@ export default function SignInFormSection() {
               placeholder="e.g Juan"
               required
               value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
+              onChange={(e) => {
+                setFirstName(e.target.value);
+                if (firstNameError) setFirstNameError("");
+              }}
+              onBlur={() => setFirstNameError(validateFirstName(firstName))}
+              error={firstNameError}
             />
           </div>
 
@@ -119,10 +165,11 @@ export default function SignInFormSection() {
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
+              if (emailError) setEmailError("");
               if (emailTaken) setEmailTaken(false);
             }}
             onBlur={handleEmailBlur}
-            className={emailTaken ? "!border-red-500" : ""}
+            error={emailError}
           />
 
           <CommonInput
@@ -132,7 +179,12 @@ export default function SignInFormSection() {
             placeholder="Password"
             required
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (passwordError) setPasswordError("");
+            }}
+            onBlur={() => setPasswordError(validatePassword(password))}
+            error={passwordError}
           />
 
           <CommonInput
@@ -142,33 +194,33 @@ export default function SignInFormSection() {
             placeholder="Confirm Password"
             required
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              if (confirmPasswordError) setConfirmPasswordError("");
+            }}
+            onBlur={() =>
+              setConfirmPasswordError(validateConfirmPassword(password, confirmPassword))
+            }
+            error={confirmPasswordError}
           />
 
           {error && (
             <p className="text-xs font-medium text-red-500">{error}</p>
           )}
 
-          {emailTaken && (
-            <p className="text-xs font-medium text-red-500">
-              This email is already registered.
-            </p>
-          )}
-
           <CommonButton
             type="submit"
             variant="secondary"
-            disabled={submitting || emailTaken}
+            disabled={submitting}
             className="flex w-full items-center justify-center gap-2"
           >
-            {submitting
-              ? "Creating Account..."
-              : (
-                <>
-                  Create Account <ArrowRight size={16} />
-                </>
-              )
-            }
+            {submitting ? (
+              "Creating Account..."
+            ) : (
+              <>
+                Create Account <ArrowRight size={16} />
+              </>
+            )}
           </CommonButton>
         </form>
 
@@ -188,5 +240,5 @@ export default function SignInFormSection() {
         privacy notice.
       </p>
     </div>
-  )
+  );
 }

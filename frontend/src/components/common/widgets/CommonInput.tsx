@@ -38,25 +38,10 @@ interface CommonInputProps extends InputHTMLAttributes<HTMLInputElement> {
    * 'password' — same look as 'default' + eye/eye-off visibility toggle
    */
   variant?: CommonInputVariant
+  /** Error message. When non-empty, the input shows a red border and the message appears below. */
+  error?: string
 }
 
-/**
- * @example
- * // Basic input
- * <CommonInput id="email" label="Email Address" type="email" placeholder="admin@gmail.com" />
- *
- * @example
- * // Password with show/hide toggle
- * <CommonInput id="password" label="Password" variant="password" placeholder="Enter your password" />
- *
- * @example
- * // With an icon
- * <CommonInput id="email" label="Email" type="email" icon={<Mail size={18} />} />
- *
- * @example
- * // Required indicator
- * <CommonInput id="lastName" label="Last name" required placeholder="e.g. Cruz" />
- */
 export default function CommonInput({
   label,
   icon,
@@ -64,6 +49,7 @@ export default function CommonInput({
   className = "",
   type,
   required,
+  error = "",
   ...props
 }: CommonInputProps) {
   const isPassword = variant === "password"
@@ -73,6 +59,7 @@ export default function CommonInput({
   const [showPassword, setShowPassword] = useState(false)
 
   const resolvedType = isPassword ? (showPassword ? "text" : "password") : type
+  const hasError = Boolean(error)
 
   return (
     <div>
@@ -98,11 +85,13 @@ export default function CommonInput({
           {...props}
           required={required}
           type={resolvedType}
+          aria-invalid={hasError}
           className={`
             w-full outline-none
             ${icon ? "pl-10" : "pl-4"}
             ${isPassword ? "pr-11" : "pr-4"}
             ${inputClass}
+            ${hasError ? "!border-red-500 focus:!border-red-500" : ""}
             ${className}
           `}
         />
@@ -118,6 +107,10 @@ export default function CommonInput({
           </button>
         )}
       </div>
+
+      {hasError && (
+        <p className="mt-1 text-xs font-medium text-red-500">{error}</p>
+      )}
     </div>
   )
 }
