@@ -62,7 +62,7 @@ export default function SettingsDashboard() {
     <DashboardPage>
       <PageHeader
         eyebrow="Manage / Workspace"
-        title="Workspace settings"
+        title="TODO: Workspace settings"
         description="Shape the operational defaults for the Compair repair desk."
         action={
           <CommonButton

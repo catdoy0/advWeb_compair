@@ -141,7 +141,7 @@ def edit_user(
 
 
 @router.post("/reset-user-password")
-def reset_user_pasword(
+def reset_user_password(
     request: Request,
     response: Response,
     user_id: int
@@ -152,9 +152,8 @@ def reset_user_pasword(
             detail="You do not have permission to access this resource",
         )
 
-
     raw_password = admin_sql.reset_user_password(user_id)
     if not raw_password:
-        raise HTTPException( status_code=400, detail="Failed to reset password")
-    return raw_password
+        raise HTTPException(status_code=400, detail="Failed to reset password")
 
+    return {"password": raw_password}

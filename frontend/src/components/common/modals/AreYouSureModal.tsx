@@ -1,6 +1,7 @@
 import { TriangleAlert } from "lucide-react";
 import Modal from "./Modal";
 import CommonButton from "../widgets/CommonButton";
+import { useEnterKey } from "../../../hooks/useModalKeys";
 
 interface AreYouSureModalProps {
   open: boolean;
@@ -30,6 +31,7 @@ export default function AreYouSureModal({
     await onConfirm();
     onClose();
   };
+  useEnterKey({ open, onEnter: handleConfirm });
 
   return (
     <Modal open={open} onClose={onClose}>

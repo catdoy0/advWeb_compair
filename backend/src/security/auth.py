@@ -5,7 +5,7 @@ from src.config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 from src.models.users import UserRole
 from src.security.tokens import decode_access_token
 from src.services.auth import refresh_session
-# from src.sql import auth as auth_sql
+from src.sql import auth as auth_sql
 
 ACCESS_MAX_AGE = ACCESS_TOKEN_EXPIRE_MINUTES * 60
 REFRESH_MAX_AGE = REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
@@ -22,13 +22,13 @@ def check_user_role(
     if access_token:
         try:
             claims = decode_access_token(access_token)
-            role = UserRole(claims["role"])
-            return role in allowed_roles
+            # role = UserRole(claims["role"])
+            # return role in allowed_roles
 
-            # user_id = int(claims["sub"])
-            # user = auth_sql.get_user_by_id(user_id)
-            # if user is not None and user.role.value == claims["role"]:
-            #     return user.role in allowed_roles
+            user_id = int(claims["sub"])
+            user = auth_sql.get_user_by_id(user_id)
+            if user is not None and user.role.value == claims["role"]:
+                return user.role in allowed_roles
 
         except (PyJWTError, KeyError, TypeError, ValueError):
             pass

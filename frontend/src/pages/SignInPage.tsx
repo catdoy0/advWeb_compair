@@ -3,10 +3,13 @@ import SignInFormSection from "../modules/authPage/components/SignInFormSection"
 import SignUpFormSection from "../modules/authPage/components/SignUpFormSection";
 import { useSearchParams } from "react-router";
 import QueryParamRedirect from "../components/common/QueryParamRedirect";
+import { useTitle } from "../hooks/useTitle";
 
 export default function SignInPage() {
   const [searchParams] = useSearchParams();
   const authType = searchParams.get("type") || "signin";
+
+  useTitle("Sign in")
 
   return (
     <QueryParamRedirect paramName="type" defaultValue="signin">

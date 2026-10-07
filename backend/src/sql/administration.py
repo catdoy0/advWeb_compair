@@ -12,36 +12,6 @@ from src.schemas.administration import GetUsers
 from src.security.passwords import hash_password
 
 
-# def get_users(
-#     how_many: int = 10,
-#     offset: int = 0,
-#     search: str = "",
-# ) -> tuple[list[Users], int]:
-#     how_many = max(1, min(how_many, 100))
-#     offset = max(0, offset)
-#
-#     with Session(engine) as s:
-#         base = select(Users)
-#
-#         if (term := search.strip()):
-#             pattern = f"%{term}%"
-#             base = base.where(
-#                 or_(
-#                     Users.first_name.ilike(pattern),
-#                     Users.last_name.ilike(pattern),
-#                     Users.email.ilike(pattern),
-#                 )
-#             )
-#
-#         total = s.exec(
-#             select(func.count()).select_from(base.subquery())
-#         ).one()
-#
-#         rows = s.exec(
-#             base.order_by(Users.id).offset(offset).limit(how_many)
-#         ).all()
-#
-#         return list(rows), total
 def get_users(how_many: int = 10, page: int = 1, search: str = "", role: str = "") -> list[GetUsers]:
     """
     raw dog sql
@@ -189,21 +159,52 @@ def get_user_state(user_id: int) -> tuple[str, bool] | None:
         return user.role.value, user.is_active
 
 
+
+
+# def reset_user_password(user_id: int) -> str:
+#     try:
+#         with Session(engine) as s:
+#             user = s.get(Users, user_id)
+#             if not user:
+#                 return ""
+#
+#             alphabet = string.ascii_letters + string.digits
+#             raw_password = "".join(secrets.choice(alphabet) for _ in range(8))
+#
+#             user.password_hash = hash_password(raw_password)
+#             user.updated_at = datetime.now(timezone.utc)
+#             s.commit()
+#
+#             return raw_password
+#     except SQLAlchemyError as e:
+#         print(f"reset_user_password failed: {e}")
+#         return ""
 def reset_user_password(user_id: int) -> str:
     try:
+        alphabet = string.ascii_letters + string.digits
+        raw_password = "".join(secrets.choice(alphabet) for _ in range(8))
+        hashed = hash_password(raw_password)
+
         with Session(engine) as s:
-            user = s.get(Users, user_id)
-            if not user:
-                return ""
-
-            alphabet = string.ascii_letters + string.digits
-            raw_password = "".join(secrets.choice(alphabet) for _ in range(8))
-
-            user.password_hash = hash_password(raw_password)
-            user.updated_at = datetime.now(timezone.utc)
+            result = s.execute(
+                text("""
+                    UPDATE users
+                    SET password_hash = :password_hash,
+                        updated_at = :updated_at
+                    WHERE id = :user_id
+                """),
+                {
+                    "password_hash": hashed,
+                    "updated_at": datetime.now(timezone.utc),
+                    "user_id": user_id,
+                },
+            )
             s.commit()
 
-            return raw_password
+            if result.rowcount == 0: # type: ignore
+                return ""
+
+        return raw_password
     except SQLAlchemyError as e:
         print(f"reset_user_password failed: {e}")
         return ""

@@ -50,9 +50,7 @@ export async function setUserActive( userId: number, isActive: boolean,): Promis
 }
 
 
-export async function editUser(
-  user: GetUser,
-): Promise<{ ok: boolean; message: string }> {
+export async function editUser( user: GetUser,): Promise<{ ok: boolean; message: string }> {
   const res = await fetch(`${API_URL}/${ADMINISTRATION}/edit-user`, {
     method: "POST",
     credentials: "include",
@@ -74,4 +72,24 @@ export async function editUser(
   }
 
   return { ok: true, message: "Changes saved." };
+}
+
+export async function resetPassword(
+  userId: number,
+): Promise<{ ok: boolean; password: string; message: string }> {
+  const res = await fetch(
+    `${API_URL}/${ADMINISTRATION}/reset-user-password?user_id=${userId}`,
+    {
+      method: "POST",
+      credentials: "include",
+    },
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    return { ok: false, password: "", message: data.detail ?? "Failed to reset password." };
+  }
+
+  return { ok: true, password: data.password, message: "Password reset." };
 }

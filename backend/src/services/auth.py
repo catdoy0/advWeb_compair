@@ -91,7 +91,7 @@ def refresh_session(raw_token: str | None) -> tuple[Users, str]:
         raise HTTPException(status_code=401, detail="Refresh token is expired")
 
     user = auth_sql.get_user_by_id(row.user_id)
-    if not user or not user.is_active:
+    if not user:
         auth_sql.delete_refresh(row.id)
         raise HTTPException(status_code=401, detail="Account is unavailable")
 

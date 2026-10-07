@@ -8,6 +8,7 @@ from src.config import validate_config
 from src.database import assert_database_ready, ensure_default_super_admin
 from src.routes.administration import router as adminRouter
 from src.routes.auth import router as authRouter
+from src.routes.profile import router as profileRouter
 
 
 @asynccontextmanager
@@ -36,6 +37,7 @@ app.add_middleware(
 
 app.include_router(authRouter, prefix="/auth")
 app.include_router(adminRouter, prefix="/administration")
+app.include_router(profileRouter, prefix="/profile")
 
 
 @app.get("/")

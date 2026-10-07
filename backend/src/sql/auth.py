@@ -22,7 +22,9 @@ def get_user_by_email(email: str) -> Users | None:
 
 def get_user_by_id(user_id: int) -> Users | None:
     with Session(engine) as s:
-        return s.get(Users, user_id)
+        return s.exec(
+            select(Users).where(Users.id == user_id, Users.is_active == True)
+        ).first()
 
 
 def email_exists(email: str) -> bool:

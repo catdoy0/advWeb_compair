@@ -7,8 +7,13 @@ import CommonDashboardHeader from "../components/common/layout/CommonDashboardHe
 import AreYouSureModal from "../components/common/modals/AreYouSureModal";
 import { dummySession } from "../dummyData";
 import { getNavLabel } from "../modules/dashboard/DashboardNav";
+import { useTitle } from "../hooks/useTitle";
+import { useLoading } from "../context/LoadingContext";
+import LoadingScreen from "../components/common/LoadingScreen";
 
 export default function DashboardPage() {
+  const { isLoading } = useLoading();
+
   const [isAreYouSureModalOpen, setIsAreYouSureModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -30,9 +35,11 @@ export default function DashboardPage() {
   ).toUpperCase();
 
   const contentLabel = getNavLabel(user.role, pathname);
+  useTitle("Dashboard")
 
   return (
     <>
+      {isLoading && <LoadingScreen />}
       {/* Full-height app shell — nothing outside scrolls */}
       <div className="fixed inset-0 flex h-dvh w-full overflow-hidden bg-[#f7f9fc] dark:bg-[#0f1724]">
         {/* Sidebar: fixed column, scrolls on its own if it needs to */}

@@ -1,12 +1,11 @@
-import { useState } from "react";
 import { KeyRound, Save, ShieldCheck, ShieldOff } from "lucide-react";
 
 import Modal from "../../../../components/common/modals/Modal";
 import CommonButton from "../../../../components/common/widgets/CommonButton";
 import type { GetUser } from "../../../../types/administration";
-import { editUser, setUserActive } from "../../../../api/administration";
 import MessageModal from "../../../../components/common/modals/MessageModal";
 import { useEnterKey } from "../../../../hooks/useModalKeys";
+import { useEditAccountForm } from "../../../../hooks/administration";
 
 const inputClass =
   "h-10 w-full rounded-md border border-[#cfd9e8] bg-white px-3 text-[12px] text-[#102c50] outline-none placeholder:text-slate-400 focus:border-[#2870e8] dark:border-slate-600 dark:bg-[#182536] dark:text-white";
@@ -53,85 +52,23 @@ function EditAccountForm({
   user,
   onUpdated,
 }: EditAccountModalProps & { user: GetUser }) {
+  const form = useEditAccountForm(user, onUpdated);
 
+  const fullName =
+    [form.firstName, form.lastName].filter(Boolean).join(" ") || form.email;
 
-  const [firstName, setFirstName] = useState(user.first_name ?? "");
-  const [lastName, setLastName] = useState(user.last_name ?? "");
-  const [email, setEmail] = useState(user.email);
-  const [role, setRole] = useState(user.role);
-
-  const [baseline, setBaseline] = useState({
-    firstName: user.first_name ?? "",
-    lastName: user.last_name ?? "",
-    email: user.email,
-    role: user.role,
-  });
-
-  const [isActive, setIsActive] = useState(user.is_active);
-
-  const [messageModalOpen, setMessageModalOpen] = useState(false);
-  const [messageModalMessage, setMessageModalMessage] = useState("");
-
-  const fullName = [firstName, lastName].filter(Boolean).join(" ") || email;
-
-  const dirty =
-    firstName !== baseline.firstName ||
-    lastName !== baseline.lastName ||
-    email !== baseline.email ||
-    role !== baseline.role;
-
-  const handleSave = async () => {
-    if (!dirty) return;
-
-    const updated: GetUser = {
-      id: user.id,
-      first_name: firstName,
-      last_name: lastName,
-      email: email,
-      role: role,
-      is_active: isActive,
-      last_sign_in: user.last_sign_in,
-    };
-
-    const result = await editUser(updated);
-
-    setMessageModalMessage(result.message);
-    setMessageModalOpen(true);
-
-    if (!result.ok) return;
-
-    onUpdated();
-    setBaseline({ firstName, lastName, email, role });
-  };
-
-  const handleToggleActive = async () => {
-    const nextActive = !isActive;
-
-    const result = await setUserActive(user.id, nextActive);
-
-    if (!result.ok) {
-      setMessageModalMessage(result.message);
-      setMessageModalOpen(true);
-      return;
-    }
-
-    setIsActive(nextActive);
-    onUpdated();
-  };
-
-
- useEnterKey({
+  useEnterKey({
     open,
-    onEnter: handleSave,
-    enabled: dirty,
+    onEnter: form.handleSave,
+    enabled: form.dirty,
   });
 
   return (
     <Modal open={open} onClose={onClose} large>
       <MessageModal
-        open={messageModalOpen}
-        onClose={() => setMessageModalOpen(false)}
-        title={messageModalMessage}
+        open={form.messageModalOpen}
+        onClose={() => form.setMessageModalOpen(false)}
+        title={form.messageModalMessage}
       />
 
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#2870e8]">
@@ -146,12 +83,12 @@ function EditAccountForm({
 
           <span
             className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-              isActive
+              form.isActive
                 ? "bg-[#e6f5ef] text-[#15946a]"
                 : "bg-[#fdecec] text-[#c0392b]"
             }`}
           >
-            {isActive ? "Active" : "Suspended"}
+            {form.isActive ? "Active" : "Suspended"}
           </span>
         </div>
 
@@ -164,8 +101,8 @@ function EditAccountForm({
         <div>
           <label className={labelClass}>First name</label>
           <input
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
+            value={form.firstName}
+            onChange={(e) => form.setFirstName(e.target.value)}
             className={`${inputClass} mt-1.5`}
           />
         </div>
@@ -173,8 +110,8 @@ function EditAccountForm({
         <div>
           <label className={labelClass}>Last name</label>
           <input
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
+            value={form.lastName}
+            onChange={(e) => form.setLastName(e.target.value)}
             className={`${inputClass} mt-1.5`}
           />
         </div>
@@ -183,8 +120,8 @@ function EditAccountForm({
           <label className={labelClass}>Email</label>
           <input
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={form.email}
+            onChange={(e) => form.setEmail(e.target.value)}
             className={`${inputClass} mt-1.5`}
           />
         </div>
@@ -192,8 +129,8 @@ function EditAccountForm({
         <div>
           <label className={labelClass}>Role</label>
           <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
+            value={form.role}
+            onChange={(e) => form.setRole(e.target.value)}
             className={`${inputClass} mt-1.5`}
           >
             {ROLE_OPTIONS.map((r) => (
@@ -218,14 +155,15 @@ function EditAccountForm({
         <CommonButton
           variant="outline"
           className="flex items-center gap-2 border-[#d4ddea] px-4 py-2"
+          onClick={form.handleResetPassword}
         >
           <KeyRound size={13} />
           Reset password
         </CommonButton>
 
-        {isActive ? (
+        {form.isActive ? (
           <CommonButton
-            onClick={handleToggleActive}
+            onClick={form.handleToggleActive}
             className="flex items-center gap-2 bg-[#c0392b] px-4 py-2 hover:bg-[#a83226]"
           >
             <ShieldOff size={13} />
@@ -233,7 +171,7 @@ function EditAccountForm({
           </CommonButton>
         ) : (
           <CommonButton
-            onClick={handleToggleActive}
+            onClick={form.handleToggleActive}
             className="flex items-center gap-2 bg-[#15946a] px-4 py-2 hover:bg-[#0f7a55]"
           >
             <ShieldCheck size={13} />
@@ -242,8 +180,8 @@ function EditAccountForm({
         )}
 
         <CommonButton
-          onClick={handleSave}
-          disabled={!dirty}
+          onClick={form.handleSave}
+          disabled={!form.dirty}
           className="flex items-center gap-2 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Save size={13} />

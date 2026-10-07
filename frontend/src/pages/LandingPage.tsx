@@ -10,7 +10,7 @@ import ScrollToTopButton from "../components/common/widgets/ScrollToTopButton"
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen scroll-smooth bg-white text-slate-900 transition-colors duration-300 dark:bg-[#0f1724] dark:text-slate-100">
+    <main className="h-screen scroll-smooth bg-white text-slate-900 transition-colors duration-300 dark:bg-[#0f1724] dark:text-slate-100">
       <Navbar />
 
       <HeroSection />

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Bell, Mail, User } from "lucide-react"
 
 import Logo from "../components/common/widgets/Logo"
@@ -48,10 +48,14 @@ export default function TestComponent() {
   const [backgroundActive, setBackgroundActive] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
+  useEffect(() => {
+    document.title = "Compair: test-components"
+  })
+
   return (
     <CommonBackground
       variant={backgroundActive ? "purpleGradient" : "none"}
-      className={`min-h-screen px-4 py-10 transition-colors duration-250 sm:px-6 `}>
+      className={`h-screen px-4 py-10 transition-colors duration-250 sm:px-6 `}>
       {isLoading && (
         <>
           <CommonButton
