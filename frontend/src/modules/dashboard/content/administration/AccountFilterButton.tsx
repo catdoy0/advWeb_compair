@@ -15,7 +15,7 @@ export default function AccountFilterButton({
       onClick={onClick}
       className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold transition-colors ${
         active
-          ? "bg-[#eef4ff] text-[#2870e8] ring-1 ring-[#cfe0ff]"
+          ? "bg-[#eef4ff] dark:bg-[#1d4775] text-[#2870e8] dark:text-[#6c9df0] ring-1 ring-[#cfe0ff] dark:ring-[#1d4775]"
           : "text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
       }`}
     >

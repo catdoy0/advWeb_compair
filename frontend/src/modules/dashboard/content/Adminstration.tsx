@@ -41,7 +41,7 @@ const accountColumns = (
       <span
         className={`inline-flex rounded px-2 py-1 text-[9px] font-bold ${
           account.status === "Active"
-            ? "bg-[#e6f5ef] text-[#15946a]"
+            ? "bg-[#e6f5ef] dark:bg-[#1d4775] text-[#15946a] dark:text-[#00d68f]"
             : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
         }`}
       >

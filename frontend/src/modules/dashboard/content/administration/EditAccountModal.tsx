@@ -84,8 +84,8 @@ function EditAccountForm({
           <span
             className={`rounded px-2 py-0.5 text-[10px] font-bold ${
               form.isActive
-                ? "bg-[#e6f5ef] text-[#15946a]"
-                : "bg-[#fdecec] text-[#c0392b]"
+            ? "bg-[#e6f5ef] dark:bg-[#1d4775] text-[#15946a] dark:text-[#00d68f]"
+            : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
             }`}
           >
             {form.isActive ? "Active" : "Suspended"}
