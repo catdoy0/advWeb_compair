@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlmodel import Field, SQLModel
 
@@ -13,4 +13,4 @@ class Conversations(SQLModel, table=True):
     )
 
     created_at: datetime
-    updated_at: datetime | None = None
+    last_message_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
