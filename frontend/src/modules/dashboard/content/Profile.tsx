@@ -191,15 +191,15 @@ export default function Profile() {
 
             <dl className="grid grid-cols-2 gap-4 border-b border-[#e6ebf2] py-4 dark:border-slate-700">
               <div>
-                <dt className="text-[9px] text-slate-400">Full name</dt>
+                <dt className="text-[9px] text-slate-400">Last name</dt>
                 <dd className="mt-1 text-[11px] font-bold text-[#102c50] dark:text-white">
-                  {fullName}
+                  {user.lastName}
                 </dd>
               </div>
               <div>
-                <dt className="text-[9px] text-slate-400">Last sign in</dt>
+                <dt className="text-[9px] text-slate-400">First name</dt>
                 <dd className="mt-1 text-[11px] font-bold text-[#102c50] dark:text-white">
-                  Just now
+                  {user.firstName}
                 </dd>
               </div>
             </dl>

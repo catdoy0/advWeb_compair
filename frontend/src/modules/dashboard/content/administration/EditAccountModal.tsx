@@ -140,9 +140,13 @@ function EditAccountForm({
             ))}
           </select>
         </div>
-      </div>
+        <div className="text-center">
+          <label className={labelClass}>Joined at</label>
+          <p className="text-sm font-semibold text-[#102c50] dark:text-white">
+            {formatDateTime(user.created_at)}
+          </p>
+        </div>
 
-      <div className="flex mt-5 justify-center w-full">
         <div className="text-center">
           <label className={labelClass}>Last sign in</label>
           <p className="text-sm font-semibold text-[#102c50] dark:text-white">
@@ -150,6 +154,7 @@ function EditAccountForm({
           </p>
         </div>
       </div>
+
 
       <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-[#e6ebf2] pt-4 dark:border-slate-700">
         <CommonButton

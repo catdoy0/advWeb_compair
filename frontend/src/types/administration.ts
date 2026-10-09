@@ -4,6 +4,7 @@ export interface GetUser {
   last_name?: string;
   email: string;
   role: string;
+  created_at?: string;
   is_active: boolean;
   last_sign_in?: string;
 }

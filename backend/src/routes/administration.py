@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from src.models.users import UserRole
 from src.schemas.administration import GetUsers
 from src.security.auth import check_user_role
-from src.services.administration import get_current_user_id
+from src.services.auth import get_current_user_id
 from src.sql import administration as admin_sql
 from src.sql import auth as auth_sql
 

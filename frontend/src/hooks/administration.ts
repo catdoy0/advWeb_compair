@@ -39,7 +39,6 @@ export function useAccountsAdmin() {
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [messageModalMessage, setMessageModalMessage] = useState("");
 
-  // load the list whenever the query changes
   useEffect(() => {
     let cancelled = false;
 

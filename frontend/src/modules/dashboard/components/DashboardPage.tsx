@@ -12,7 +12,7 @@ export default function DashboardPage({
   maxWidth = "1240px",
   className = "bg-[#f7f9fc] dark:bg-[#0f1724]",
 }: DashboardPageProps) {
-  const widthClass = maxWidth === "1180px" ? "max-w-[1180px]" : "max-w-[1240px]";
+  const widthClass = maxWidth === "1180px" ? "max-w-[1180px]" : "max-w-[1600px]";
 
   return (
     <main className={`min-h-full ${className}`}>
