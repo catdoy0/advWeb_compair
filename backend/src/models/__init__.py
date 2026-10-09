@@ -4,12 +4,14 @@ from src.models.devices import Devices
 from src.models.enums import (
     AppointmentStatus,
     ComputerType,
+    NotificationType,
     PaymentMethod,
     PaymentStatus,
     RepairRequestStatus,
     UserRole,
 )
 from src.models.messages import Messages
+from src.models.notifications import Notifications
 from src.models.parts import Parts
 from src.models.payments import Payments
 from src.models.refresh_sessions import Refresh_Session
@@ -26,6 +28,8 @@ __all__ = [
     "Conversations",
     "Devices",
     "Messages",
+    "NotificationType",
+    "Notifications",
     "Parts",
     "PaymentMethod",
     "PaymentStatus",
@@ -37,5 +41,5 @@ __all__ = [
     "Repair_Requests",
     "Repairs",
     "UserRole",
-    "Users",
+    "Users"
 ]

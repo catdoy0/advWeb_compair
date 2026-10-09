@@ -33,6 +33,7 @@ import Reports from './modules/dashboard/content/Reports'
 import ArchivePage from './modules/dashboard/content/Archive'
 import LoadingScreen from './components/common/LoadingScreen'
 import { LoadingProvider } from './context/LoadingContext'
+import { EventProvider } from './context/EventContext'
 
 export default function App() {
   const { loading } = useAuth();
@@ -62,9 +63,11 @@ export default function App() {
           <Route path={ROUTES.DASHBOARD.ROOT} element={
             <ProtectedRoute skip={false}>
               <RoleGuard>
-                <LoadingProvider>
-                  <DashboardPage/>
-                </LoadingProvider>
+                <EventProvider>
+                  <LoadingProvider>
+                    <DashboardPage/>
+                  </LoadingProvider>
+                </EventProvider>
               </RoleGuard>
             </ProtectedRoute>
           }>

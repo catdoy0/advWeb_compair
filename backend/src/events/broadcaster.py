@@ -52,3 +52,14 @@ async def publish_message(
             continue
 
         await sub.queue.put({"event": "new-message", "data": payload})
+
+
+async def publish_to_users(
+    user_ids: set[int],
+    event_type: str,
+    data: dict,
+) -> None:
+    """Send an event to specific users across all their open connections."""
+    for sub in list(_subscribers):
+        if sub.user_id in user_ids:
+            await sub.queue.put({"event": event_type, "data": data})

@@ -11,6 +11,7 @@ from src.routes.appointments import router as appointmentsRouter
 from src.routes.auth import router as authRouter
 from src.routes.conversations import router as conversationsRouter
 from src.routes.events import router as eventsRouter
+from src.routes.notifications import router as notificationsRouter
 from src.routes.profile import router as profileRouter
 from src.routes.repair_requests import router as repairRequestsRouter
 
@@ -46,6 +47,7 @@ app.include_router(conversationsRouter, prefix="/conversations")
 app.include_router(eventsRouter, prefix="/events")
 app.include_router(repairRequestsRouter, prefix="/repair-requests")
 app.include_router(appointmentsRouter, prefix="/appointments")
+app.include_router(notificationsRouter, prefix="/notifications")
 
 
 @app.get("/")

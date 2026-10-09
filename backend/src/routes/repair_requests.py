@@ -6,6 +6,7 @@ from src.schemas.repair_request import (
     CreateRepairRequestRequest,
     RepairRequestCreated,
 )
+from src.services import notification as notif_service
 from src.services.auth import get_current_user_id
 from src.sql import repair_request as rr_sql
 from src.sql.auth import get_user_by_id
@@ -41,7 +42,7 @@ def _validate_preferred_datetime(body: CreateRepairRequestRequest):
 
 
 @router.post("/", response_model=RepairRequestCreated)
-def create_repair_request(
+async def create_repair_request(
     body: CreateRepairRequestRequest,
     request: Request,
 ):
@@ -93,6 +94,18 @@ def create_repair_request(
     conv = rr_sql.create_conversation_for_repair(
         customer_id=user.id,
         repair_request_id=req.id,
+    )
+
+    customer = get_user_by_id(user.id)
+    customer_name = " ".join(
+        p for p in [customer.first_name or "", customer.last_name or ""] if p # type: ignore
+    ).strip() or customer.email # type: ignore
+
+    await notif_service.notify_team_new_repair_request(
+        repair_request_id=req.id,
+        repair_number=req.repair_number,
+        customer_name=customer_name,
+        computer_name=device.computer_name,
     )
 
     return RepairRequestCreated(

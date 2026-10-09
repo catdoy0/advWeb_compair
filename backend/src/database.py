@@ -8,7 +8,7 @@ from src.models.users import Users
 
 _database_url = DATABASE_URL or ""
 
-engine = create_engine(_database_url, echo=True)
+engine = create_engine(_database_url, echo=False)
 
 
 def get_session():
