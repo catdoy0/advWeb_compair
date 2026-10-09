@@ -28,6 +28,7 @@ export default function DashboardSidebar({
       user={{
         initials: userInitials,
         name: userName,
+        role: role
       }}
       open={open}
       onClose={onClose}

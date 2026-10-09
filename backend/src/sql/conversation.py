@@ -94,8 +94,7 @@ def list_conversations_for_team() -> list[dict]:
                 u.last_name,
                 u.email,
                 rr.repair_number,
-                d.brand,
-                d.model,
+                d.computer_name,
                 m.content AS last_message
             FROM conversations c
             JOIN users u ON u.id = c.customer_id
@@ -127,8 +126,7 @@ def list_conversations_for_team() -> list[dict]:
             "last_name": row["last_name"],
             "email": row["email"],
             "repair_number": row["repair_number"],
-            "brand": row["brand"],
-            "model": row["model"],
+            "computer_name": row["computer_name"],
             "last_message": row["last_message"],
         })
 
@@ -145,8 +143,7 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
                 c.repair_request_id,
                 c.last_message_at,
                 rr.repair_number,
-                d.brand,
-                d.model,
+                d.computer_name,
                 m.content AS last_message
             FROM conversations c
             LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
@@ -170,8 +167,7 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
             "repair_request_id": row["repair_request_id"],
             "last_message_at": row["last_message_at"],
             "repair_number": row["repair_number"],
-            "brand": row["brand"],
-            "model": row["model"],
+            "computer_name": row["computer_name"],
             "last_message": row["last_message"],
         })
 

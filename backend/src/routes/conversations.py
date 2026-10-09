@@ -56,7 +56,7 @@ def list_conversations(request: Request):
             "customer_name": None,
             "customer_email": None,
             "repair_number": row["repair_number"],
-            "device_label": _device_label(row["brand"], row["model"]),
+            "device_label": row["computer_name"],
             "preview": row["last_message"],
             "unread_count": 0,
         })
@@ -69,15 +69,6 @@ def list_conversations(request: Request):
             result[i]["customer_email"] = row["email"]
 
     return result
-
-
-def _device_label(brand, model) -> str | None:
-    if not brand and not model:
-        return None
-    if brand and model:
-        return f"{brand} {model}"
-    return brand or model
-
 
 
 @router.get("/{conversation_id}")

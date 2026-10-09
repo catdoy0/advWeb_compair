@@ -47,7 +47,7 @@ function conversationSubtitle(conv: Conversation, isCustomer: boolean): string {
         ? `${conv.repair_number} · ${conv.device_label}`
         : conv.repair_number;
     }
-    return "General";
+    return "";
   }
   if (conv.repair_request_id === null) return "General support";
   return conv.device_label || "Repair chat";

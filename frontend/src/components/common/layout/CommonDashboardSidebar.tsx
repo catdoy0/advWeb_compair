@@ -26,6 +26,7 @@ interface CommonDashboardSidebarProps {
   user?: {
     initials: string
     name: string
+    role: string
   }
 
   onLogout?: () => void
@@ -138,12 +139,19 @@ export default function CommonDashboardSidebar({
         {/* User */}
         {user && (
           <div className="shrink-0 border-t border-[#1c3552] p-4">
-            <div className="flex items-center gap-3">
-              <UserAvatar initials={user.initials} tone="sidebar" />
+            <div className="flex justify-between items-center gap-3">
+              <div className="flex gap-2 items-center">
+                <UserAvatar initials={user.initials} tone="sidebar" />
 
-              <p className="min-w-0 flex-1 truncate text-[10px] font-semibold text-white">
-                {user.name}
-              </p>
+                <div className="flex flex-col gap-1">
+                  <p className="min-w-0 flex-1 truncate text-xs font-semibold text-white">
+                    {user.name}
+                  </p>
+                  <span className="text-[8px] text-slate-400">
+                    {user.role}
+                  </span>
+                </div>
+              </div>
 
               {onLogout && (
                 <CommonButton

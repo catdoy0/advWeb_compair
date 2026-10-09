@@ -22,7 +22,6 @@ def _generate_repair_number() -> str:
     return f"CP-{secrets.token_hex(3).upper()}"
 
 
-# ---------- writes ----------
 
 def find_device(customer_id: int, computer_name: str) -> Devices | None:
     with Session(engine) as s:
@@ -219,3 +218,16 @@ def next_appointment_date(customer_id: int | None) -> date | None:
         row = s.execute(sql, params).first()
 
     return row[0] if row and row[0] else None
+
+
+def count_appointments_for_day(on_date: date) -> int:
+    with Session(engine) as s:
+        return s.execute(
+            text("""
+                SELECT COUNT(*)
+                FROM appointments
+                WHERE scheduled_date = :day
+                  AND status != 'CANCELLED'
+            """),
+            {"day": on_date},
+        ).scalar_one()

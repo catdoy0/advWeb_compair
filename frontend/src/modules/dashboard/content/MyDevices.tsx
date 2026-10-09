@@ -1,6 +1,4 @@
-import { ArrowDownToLine } from "lucide-react";
 import PageHeader from "../components/PageHeader";
-import CommonButton from "../../../components/common/widgets/CommonButton";
 import DataTable, { type DataTableColumn } from "../../../components/common/widgets/DataTable";
 import type { Status } from "../../../components/common/widgets/StatusBox";
 import StatusBox from "../../../components/common/widgets/StatusBox";
@@ -65,14 +63,6 @@ export default function MyDevices() {
           eyebrow="Directory / Devices"
           title="Computer Records"
           description="Keep every computer tied to a service request or customer record."
-          action={
-            <CommonButton variant="outline"
-              className="flex items-center gap-2 self-start border-[#d4ddea] px-4 py-2 xl:self-auto"
-            >
-              <ArrowDownToLine size={15} />
-              Export records
-            </CommonButton>
-          }
         />
 
 

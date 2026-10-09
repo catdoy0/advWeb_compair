@@ -12,6 +12,8 @@ from src.sql.auth import get_user_by_id
 
 router = APIRouter()
 
+DAY_CAPACITY = 6
+
 
 def _require_user(request: Request):
     user_id = get_current_user_id(request)
@@ -48,6 +50,13 @@ def create_repair_request(
         raise HTTPException(status_code=400, detail="User ID is required")
 
     _validate_preferred_datetime(body)
+
+    count = rr_sql.count_appointments_for_day(body.preferred_date)
+    if count >= DAY_CAPACITY:
+        raise HTTPException(
+            status_code=409,
+            detail="That day is fully booked. Please choose another date.",
+        )
 
     # find-or-create the device for this customer
     device = rr_sql.find_device(user.id, body.computer_name)

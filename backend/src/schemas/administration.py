@@ -9,7 +9,7 @@ class GetUsers(BaseModel):
     last_name: str | None
     email: str
     role: str
-    created_at: datetime
+    created_at: datetime | None = None
     is_active: bool
     last_sign_in: datetime
 

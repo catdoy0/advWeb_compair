@@ -57,6 +57,7 @@ export default function CreateRepairRequestModal({
   const [submitting, setSubmitting] = useState(false);
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [messageModalMessage, setMessageModalMessage] = useState("");
+  const [messageWasSuccess, setMessageWasSuccess] = useState(false);
 
   // bounds for the date input
   const today = dayjs();
@@ -89,16 +90,19 @@ export default function CreateRepairRequestModal({
     if (submitting) return;
 
     if (!computer.trim()) {
+      setMessageWasSuccess(false);
       setMessageModalMessage("Computer is required.");
       setMessageModalOpen(true);
       return;
     }
     if (!requestedService.trim()) {
+      setMessageWasSuccess(false);
       setMessageModalMessage("Requested service is required.");
       setMessageModalOpen(true);
       return;
     }
     if (!reportedProblem.trim()) {
+      setMessageWasSuccess(false);
       setMessageModalMessage("Reported problem is required.");
       setMessageModalOpen(true);
       return;
@@ -126,11 +130,13 @@ export default function CreateRepairRequestModal({
       });
 
       if (!result) {
+        setMessageWasSuccess(false);
         setMessageModalMessage("Failed to create repair request.");
         setMessageModalOpen(true);
         return;
       }
 
+      setMessageWasSuccess(true);
       setMessageModalMessage(
         `Repair ${result.repair_number} submitted. Check your messages for updates.`,
       );
@@ -154,7 +160,10 @@ export default function CreateRepairRequestModal({
         open={messageModalOpen}
         onClose={() => {
           setMessageModalOpen(false);
-          onClose();
+          if (messageWasSuccess) {
+            setMessageWasSuccess(false);
+            onClose();
+          }
         }}
         title={messageModalMessage}
       />
