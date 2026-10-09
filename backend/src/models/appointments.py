@@ -1,8 +1,12 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 
 from sqlmodel import Field, SQLModel
 
 from src.models.enums import AppointmentStatus
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class Appointments(SQLModel, table=True):
@@ -21,5 +25,5 @@ class Appointments(SQLModel, table=True):
         index=True,
     )
 
-    created_at: datetime
+    created_at: datetime = Field(default_factory=_now)
     updated_at: datetime | None = None

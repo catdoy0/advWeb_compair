@@ -7,10 +7,12 @@ from starlette.responses import JSONResponse
 from src.config import validate_config
 from src.database import assert_database_ready, ensure_default_super_admin
 from src.routes.administration import router as adminRouter
+from src.routes.appointments import router as appointmentsRouter
 from src.routes.auth import router as authRouter
 from src.routes.conversations import router as conversationsRouter
 from src.routes.events import router as eventsRouter
 from src.routes.profile import router as profileRouter
+from src.routes.repair_requests import router as repairRequestsRouter
 
 
 @asynccontextmanager
@@ -42,6 +44,8 @@ app.include_router(adminRouter, prefix="/administration")
 app.include_router(profileRouter, prefix="/profile")
 app.include_router(conversationsRouter, prefix="/conversations")
 app.include_router(eventsRouter, prefix="/events")
+app.include_router(repairRequestsRouter, prefix="/repair-requests")
+app.include_router(appointmentsRouter, prefix="/appointments")
 
 
 @app.get("/")

@@ -70,3 +70,27 @@ export async function session(): Promise<UserSession | null> {
     return null;
   }
 }
+
+
+export async function apiFetch(
+  path: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const url = `${API_URL}/${path}`;
+  const opts: RequestInit = { credentials: "include", ...options };
+
+  let res = await fetch(url, opts);
+
+  if (res.status === 401) {
+    const refreshed = await fetch(`${API_URL}/auth/session`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    if (refreshed.ok) {
+      res = await fetch(url, opts);
+    }
+  }
+
+  return res;
+}

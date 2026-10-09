@@ -32,7 +32,6 @@ class AppointmentStatus(str, Enum):
 class ComputerType(str, Enum):
     LAPTOP = "LAPTOP"
     DESKTOP = "DESKTOP"
-    ALL_IN_ONE = "ALL_IN_ONE"
     OTHER = "OTHER"
 
 

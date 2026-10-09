@@ -1,7 +1,9 @@
 import { ArrowRight } from "lucide-react";
 import CommonButton from "../../../components/common/widgets/CommonButton";
+import { useNavigate } from "react-router";
 
 export default function MessageShop() {
+  const navigate = useNavigate();
   return (
     <section
       className="
@@ -64,6 +66,7 @@ export default function MessageShop() {
             justify-center
             gap-2
           "
+            onClick={() => navigate("/dashboard/messages")}
         >
           Open messages
           <ArrowRight size={13} />

@@ -172,7 +172,7 @@ export default function Messages() {
     conversations.find((c) => c.id === selectedId) ?? null;
 
   return (
-    <DashboardPage className="mb-6">
+    <DashboardPage className="mb-6 pb-15">
       <PageHeader
         eyebrow="Customer care / inbox"
         title="Service messages"
@@ -185,15 +185,15 @@ export default function Messages() {
           <div className="border-b border-[#d8e0eb] px-4 py-3 dark:border-slate-700">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-[14px] font-bold text-[#102c50] dark:text-white">
+                <h2 className="text-md font-bold text-[#102c50] dark:text-white">
                   Inbox
                 </h2>
-                <p className="mt-0.5 text-[11px] text-slate-400">
+                <p className="mt-0.5 text-xs text-slate-400">
                   {conversations.length} conversation
                   {conversations.length === 1 ? "" : "s"}
                 </p>
               </div>
-              <span className="rounded bg-[#eef4ff] dark:bg-[#0b213d] px-2 py-0.5 text-[10px] font-semibold text-[#2870e8] dark:text-[#8ec5ff]">
+              <span className="rounded bg-[#eef4ff] dark:bg-[#0b213d] px-2 py-0.5 text-xs font-semibold text-[#2870e8] dark:text-[#8ec5ff]">
                 {conversations.length}
               </span>
             </div>
@@ -263,7 +263,7 @@ export default function Messages() {
             })}
 
             {filteredConversations.length === 0 && (
-              <div className="px-4 py-8 text-center text-[11px] text-slate-400">
+              <div className="px-4 py-8 text-center text-xs text-slate-400">
                 {conversations.length === 0
                   ? "No conversations yet."
                   : "Nothing matches your search."}
@@ -272,10 +272,10 @@ export default function Messages() {
           </div>
         </DashboardPanel>
 
-        {/* Conversation view */}
+
         <DashboardPanel contentClassName="flex h-full w-full min-w-0 items-center justify-center">
           {selectedConversation ? (
-            <div className="flex max-h-[700px] h-full w-full flex-col">
+            <div className="flex max-h-[670px] h-full w-full flex-col">
               <div className="flex items-center gap-3 border-b border-[#d8e0eb] px-5 py-4 dark:border-slate-700">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#dceaff] text-[10px] font-bold text-[#2870e8]">
                   {initialsOf(conversationTitle(selectedConversation, isCustomer))}
@@ -309,11 +309,11 @@ export default function Messages() {
                           isMine ? "self-end items-end" : "self-start items-start"
                         }`}
                       >
-                        <p className="mb-1 text-[9px] text-slate-400">
+                        <p className="mb-1 text-[10px] text-slate-400">
                           {messageSenderLabel(msg, currentUser.role, viewerId)}
                         </p>
                         <div
-                          className={`rounded-lg px-4 py-2.5 text-[11px] leading-5 ${
+                          className={`rounded-lg px-4 py-2.5 text-xs leading-5 ${
                             isMine
                               ? "bg-[#2870e8] text-white"
                               : "bg-[#f1f5f9] text-slate-700 dark:bg-[#182536] dark:text-slate-300"

@@ -13,7 +13,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const colors = {
   none: "",
-  primary: "bg-[#17499d] dark:bg-[#0a337a] hover:bg-[#123d85] text-white ",
+  primary: "bg-[#2f6fed] dark:bg-[#0a337a] hover:bg-[#123d85] text-white ",
   secondary: "bg-[#2d65c8] hover:bg-[#2455a8] text-white ",
   outline:
     "bg-white border-2 border-[#1e40af] hover:bg-[#f5f9ff] text-[#2453a0] dark:border-slate-600 dark:bg-slate-800 dark:text-blue-300 dark:hover:bg-slate-700",

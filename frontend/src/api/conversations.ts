@@ -1,5 +1,5 @@
-import { API_URL } from "./config";
 import type { Conversation, Message } from "../types/messages";
+import { apiFetch } from "./auth";
 
 const CHAT = "conversations";
 
@@ -12,7 +12,7 @@ const CHAT = "conversations";
 //   return await res.json();
 // }
 export async function listConversations(): Promise<Conversation[]> {
-  const res = await apiFetch(CHAT, { method: "GET" });
+  const res = await apiFetch(`${CHAT}/`, { method: "GET" });
   if (!res.ok) return [];
   return await res.json();
 }
@@ -72,29 +72,4 @@ export async function sendMessage(
   });
   if (!res.ok) return null;
   return await res.json();
-}
-
-
-
-export async function apiFetch(
-  path: string,
-  options: RequestInit = {},
-): Promise<Response> {
-  const url = `${API_URL}/${path}`;
-  const opts: RequestInit = { credentials: "include", ...options };
-
-  let res = await fetch(url, opts);
-
-  if (res.status === 401) {
-    const refreshed = await fetch(`${API_URL}/auth/session`, {
-      method: "POST",
-      credentials: "include",
-    });
-
-    if (refreshed.ok) {
-      res = await fetch(url, opts);
-    }
-  }
-
-  return res;
 }

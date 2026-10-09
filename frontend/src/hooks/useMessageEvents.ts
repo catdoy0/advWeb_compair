@@ -17,7 +17,7 @@ export function useMessageEvents(
     const connect = () => {
       if (closed) return;
 
-      es = new EventSource(`${API_URL}/events`, { withCredentials: true });
+      es = new EventSource(`${API_URL}/events/`, { withCredentials: true });
 
       es.addEventListener("new-message", (event) => {
         try {
