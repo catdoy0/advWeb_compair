@@ -15,7 +15,8 @@ async def notify_team_new_repair_request(
 
     title = f"New repair request · {repair_number}"
     body = f"{customer_name} — {computer_name}"
-    link = f"/dashboard/repair-queue/{repair_request_id}"
+    # link = f"/dashboard/repair-queue/{repair_request_id}"
+    link = "/dashboard/repair-queue"
 
     rows = notif_sql.create_notifications(
         user_ids=team_ids,

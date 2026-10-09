@@ -33,7 +33,7 @@ const settingsItem = { label: "TODO:Settings", href: dashboardPath(D.SETTINGS), 
 const archiveItem = { label: "TODO:Archive", href: dashboardPath(D.ARCHIVE), icon: Archive };
 
 const workspaceItem = { label: "TODO:Workspace", href: dashboardPath(D.WORKSPACE), icon: LayoutDashboard };
-const repairQueueItem = { label: "TODO:Repair Queue", href: dashboardPath(D.REPAIR_QUEUE), icon: Wrench };
+const repairQueueItem = { label: "Repair Queue", href: dashboardPath(D.REPAIR_QUEUE), icon: Wrench };
 const partsInventoryItem = { label: "TODO:Parts Inventory", href: dashboardPath(D.PARTS_INVENTORY), icon: Package };
 const posItem = { label: "TODO:POS", href: dashboardPath(D.POS), icon: ShoppingCart };
 const customersItem = { label: "TODO:Customers", href: dashboardPath(D.CUSTOMERS), icon: Users };

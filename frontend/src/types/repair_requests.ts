@@ -41,3 +41,62 @@ export interface Appointment {
 }
 
 export type AppointmentCountsByDay = Record<string, number>;
+
+
+export type RepairQueueStatus =
+  | "RECEIVED"
+  | "DIAGNOSING"
+  | "REPAIRING"
+  | "COMPLETED"
+  | "RELEASED"
+  | "CANCELLED";
+
+export interface RepairQueueItem {
+  id: number;
+  repair_number: string;
+  created_at: string;
+  status: RepairQueueStatus;
+  reported_problem: string;
+  computer_name: string;
+  customer_id: number;
+  customer_name: string;
+  technician_id: number | null;
+  technician_name: string | null;
+  estimate_amount: number | null;
+}
+
+export interface RepairQueueResponse {
+  items: RepairQueueItem[];
+  counts: Record<string, number>;
+}
+
+
+export interface RepairDetail {
+  id: number;
+  repair_number: string;
+  status: RepairQueueStatus;
+  created_at: string;
+  updated_at: string | null;
+
+  computer_name: string;
+  computer_type: string;
+  serial_number: string | null;
+
+  requested_service: string;
+  reported_problem: string;
+  contact_detail: string | null;
+
+  customer_id: number;
+  customer_name: string;
+  customer_email: string;
+
+  technician_id: number | null;
+  technician_name: string | null;
+
+  diagnosis: string | null;
+  estimate_amount: number | null;
+  final_amount: number | null;
+
+  appointment_date: string | null;
+  appointment_time: string | null;
+}

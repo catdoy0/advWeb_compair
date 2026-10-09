@@ -11,13 +11,13 @@ class UserRole(str, Enum):
 
 class RepairRequestStatus(str, Enum):
     PENDING = "PENDING"
-    ACCEPTED = "ACCEPTED"
     REJECTED = "REJECTED"
     CANCELLED = "CANCELLED"
-    IN_REPAIR = "IN_REPAIR"
+
+    RECEIVED = "RECEIVED"
+    DIAGNOSING = "DIAGNOSING"
+    REPAIRING = "REPAIRING"
     COMPLETED = "COMPLETED"
-    READY_FOR_PAYMENT = "READY_FOR_PAYMENT"
-    PAID = "PAID"
     RELEASED = "RELEASED"
 
 
@@ -40,8 +40,8 @@ class PaymentMethod(str, Enum):
 
 
 class PaymentStatus(str, Enum):
+    UNPAID = "UNPAID"
     PAID = "PAID"
-    CANCELLED = "CANCELLED"
     REFUNDED = "REFUNDED"
 
 

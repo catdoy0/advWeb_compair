@@ -231,3 +231,179 @@ def count_appointments_for_day(on_date: date) -> int:
             """),
             {"day": on_date},
         ).scalar_one()
+
+def list_repair_queue(status: str | None, search: str) -> list[dict]:
+    sql = """
+        SELECT
+            rr.id,
+            rr.repair_number,
+            rr.created_at,
+            rr.status,
+            rr.reported_problem,
+            d.computer_name,
+            u.id            AS customer_id,
+            u.first_name,
+            u.last_name,
+            u.email,
+            t.id            AS technician_id,
+            t.first_name    AS technician_first,
+            t.last_name     AS technician_last,
+            r.estimate_amount
+        FROM repair_requests rr
+        JOIN users u ON u.id = rr.customer_id
+        JOIN devices d ON d.id = rr.device_id
+        LEFT JOIN repairs r ON r.repair_request_id = rr.id
+        LEFT JOIN users t ON t.id = r.technician_id
+        WHERE 1=1
+    """
+
+    params: dict = {}
+
+    if status:
+        sql += " AND rr.status = CAST(:status AS repairrequeststatus)"
+        params["status"] = status
+
+    term = search.strip()
+    if term:
+        sql += """
+            AND (
+                rr.repair_number ILIKE :search
+                OR u.first_name ILIKE :search
+                OR u.last_name ILIKE :search
+                OR u.email ILIKE :search
+                OR d.computer_name ILIKE :search
+            )
+        """
+        params["search"] = f"%{term}%"
+
+    sql += " ORDER BY rr.created_at DESC"
+
+    with Session(engine) as s:
+        rows = s.execute(text(sql), params).mappings().all()
+
+    result = []
+    for row in rows:
+        customer_name = " ".join(
+            p for p in [row["first_name"], row["last_name"]] if p
+        ).strip() or row["email"]
+
+        technician_name = None
+        if row["technician_id"] is not None:
+            technician_name = " ".join(
+                p for p in [row["technician_first"], row["technician_last"]] if p
+            ).strip() or None
+
+        result.append({
+            "id": row["id"],
+            "repair_number": row["repair_number"],
+            "created_at": row["created_at"],
+            "status": row["status"],
+            "reported_problem": row["reported_problem"],
+            "computer_name": row["computer_name"],
+            "customer_id": row["customer_id"],
+            "customer_name": customer_name,
+            "technician_id": row["technician_id"],
+            "technician_name": technician_name,
+            "estimate_amount": (
+                float(row["estimate_amount"])
+                if row["estimate_amount"] is not None
+                else None
+            ),
+        })
+
+    return result
+
+
+def count_repair_queue_by_status() -> dict[str, int]:
+    with Session(engine) as s:
+        rows = s.execute(text("""
+            SELECT status, COUNT(*) AS n
+            FROM repair_requests
+            GROUP BY status
+        """)).all()
+
+    counts: dict[str, int] = {}
+    total = 0
+    for status_value, count in rows:
+        # status_value is the enum's string form (e.g. "RECEIVED")
+        counts[status_value] = count
+        total += count
+
+    counts["ALL"] = total
+    return counts
+
+
+def get_repair_detail(repair_request_id: int) -> dict | None:
+    with Session(engine) as s:
+        row = s.execute(text("""
+            SELECT
+                rr.id,
+                rr.repair_number,
+                rr.status,
+                rr.created_at,
+                rr.updated_at,
+                rr.requested_service,
+                rr.reported_problem,
+                rr.contact_detail,
+                d.computer_name,
+                d.computer_type,
+                d.serial_number,
+                u.id            AS customer_id,
+                u.first_name    AS customer_first,
+                u.last_name     AS customer_last,
+                u.email         AS customer_email,
+                t.id            AS technician_id,
+                t.first_name    AS technician_first,
+                t.last_name     AS technician_last,
+                r.diagnosis,
+                r.estimate_amount,
+                r.final_amount,
+                a.scheduled_date AS appointment_date,
+                a.scheduled_time AS appointment_time
+            FROM repair_requests rr
+            JOIN users u ON u.id = rr.customer_id
+            JOIN devices d ON d.id = rr.device_id
+            LEFT JOIN repairs r ON r.repair_request_id = rr.id
+            LEFT JOIN users t ON t.id = r.technician_id
+            LEFT JOIN appointments a ON a.repair_request_id = rr.id
+            WHERE rr.id = :id
+            ORDER BY a.scheduled_date ASC
+            LIMIT 1
+        """), {"id": repair_request_id}).mappings().first()
+
+    if row is None:
+        return None
+
+    customer_name = " ".join(
+        p for p in [row["customer_first"], row["customer_last"]] if p
+    ).strip() or row["customer_email"]
+
+    technician_name = None
+    if row["technician_id"] is not None:
+        technician_name = " ".join(
+            p for p in [row["technician_first"], row["technician_last"]] if p
+        ).strip() or None
+
+    return {
+        "id": row["id"],
+        "repair_number": row["repair_number"],
+        "status": row["status"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "computer_name": row["computer_name"],
+        "computer_type": row["computer_type"],
+        "serial_number": row["serial_number"],
+        "requested_service": row["requested_service"],
+        "reported_problem": row["reported_problem"],
+        "contact_detail": row["contact_detail"],
+        "customer_id": row["customer_id"],
+        "customer_name": customer_name,
+        "customer_email": row["customer_email"],
+        "technician_id": row["technician_id"],
+        "technician_name": technician_name,
+        "diagnosis": row["diagnosis"],
+        "estimate_amount": float(row["estimate_amount"]) if row["estimate_amount"] is not None else None,
+        "final_amount": float(row["final_amount"]) if row["final_amount"] is not None else None,
+        "appointment_date": row["appointment_date"],
+        "appointment_time": row["appointment_time"],
+    }

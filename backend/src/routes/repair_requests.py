@@ -1,7 +1,8 @@
 from datetime import date, datetime
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
+from src.models.enums import UserRole
 from src.schemas.repair_request import (
     CreateRepairRequestRequest,
     RepairRequestCreated,
@@ -41,7 +42,7 @@ def _validate_preferred_datetime(body: CreateRepairRequestRequest):
         raise HTTPException(status_code=400, detail="Preferred time must be between 8:00 and 19:00")
 
 
-@router.post("/", response_model=RepairRequestCreated)
+@router.post("", response_model=RepairRequestCreated)
 async def create_repair_request(
     body: CreateRepairRequestRequest,
     request: Request,
@@ -114,3 +115,37 @@ async def create_repair_request(
         appointment_id=appt.id, # type: ignore
         conversation_id=conv.id, # type: ignore
     )
+
+
+@router.get("")
+def list_repair_queue(
+    request: Request,
+    status: str | None = Query(None),
+    search: str = Query(""),
+):
+    user = _require_user(request)
+
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    items = rr_sql.list_repair_queue(status, search)
+    counts = rr_sql.count_repair_queue_by_status()
+
+    return {"items": items, "counts": counts}
+
+
+@router.get("/{repair_request_id}")
+def get_repair(
+    repair_request_id: int,
+    request: Request,
+):
+    user = _require_user(request)
+
+    detail = rr_sql.get_repair_detail(repair_request_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Repair not found")
+
+    if user.role == UserRole.CUSTOMER and detail["customer_id"] != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return detail
