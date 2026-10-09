@@ -23,15 +23,29 @@ export function useNotifications() {
     ]);
     setItems(list);
     setUnread(count);
-    setLoading(false);
   }, []);
 
   // initial load
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let cancelled = false;
 
-  // SSE — bump the count and refresh the list when a notification arrives
+    (async () => {
+      const [list, count] = await Promise.all([
+        listNotifications(30),
+        getUnreadCount(),
+      ]);
+      if (cancelled) return;
+      setItems(list);
+      setUnread(count);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // SSE — refresh both list and count when a notification arrives
   useEffect(() => {
     return subscribe("new-notification", () => {
       refresh();

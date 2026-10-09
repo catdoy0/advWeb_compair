@@ -8,7 +8,8 @@ export function useMessageEvents(
 
   useEffect(() => {
     return subscribe("new-message", (data) => {
-      onNewMessage(data.conversation_id);
+      const payload = data as { conversation_id: number };
+      onNewMessage(payload.conversation_id);
     });
   }, [subscribe, onNewMessage]);
 }

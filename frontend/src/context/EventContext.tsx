@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { API_URL } from "../api/config";
 
-type EventHandler = (data: any) => void;
+type EventHandler = (data: unknown) => void;
 
 interface EventContextType {
   subscribe: (eventType: string, handler: EventHandler) => () => void;

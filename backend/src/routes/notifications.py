@@ -31,7 +31,7 @@ class NotificationOut(BaseModel):
     created_at: str
 
 
-@router.get("/")
+@router.get("")
 def list_notifications(
     request: Request,
     limit: int = Query(30, ge=1, le=100),
