@@ -62,7 +62,7 @@ async def notify_customer_status_changed(
     label = STATUS_LABEL.get(new_status, new_status)
     title = f"Repair {repair_number} · {label}"
     body = f"Your repair is now {label.lower()}."
-    link = "/dashboard/appointments"
+    link = "/dashboard/mydevices"
 
     notif_sql.create_notifications(
         user_ids=[customer_id],

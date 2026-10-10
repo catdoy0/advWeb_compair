@@ -119,14 +119,6 @@ export default function TeamAppointments() {
     };
   }, [ready, selectedDate, weekStart, weekEnd]);
 
-  async function refresh() {
-    const [dayAppointments, weekCounts] = await Promise.all([
-      listAppointments(selectedDate.format("YYYY-MM-DD")),
-      getAppointmentWeekCounts(weekStart, weekEnd),
-    ]);
-    setAppointments(dayAppointments);
-    setCountsByDay(weekCounts);
-  }
 
   const handlePreviousWeek = () => {
     setWeekReference((w) => w.subtract(7, "day"));

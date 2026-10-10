@@ -25,6 +25,8 @@ import {
 } from "../../../../api/repair_requests";
 import type { Appointment as ApiAppointment } from "../../../../types/repair_requests";
 
+import { useEvents } from "../../../../context/EventContext";
+
 // ---------- helpers ----------
 
 function toStatusEnum(status: string): Status {
@@ -65,6 +67,23 @@ export default function CustomerAppointments() {
   const weekDays = getWeekDays(weekReference);
   const weekStart = weekDays[0].date.format("YYYY-MM-DD");
   const weekEnd = weekDays[6].date.format("YYYY-MM-DD");
+
+  const [refreshTick, setRefreshTick] = useState(0);
+  const { subscribe } = useEvents();
+
+  useEffect(() => {
+    return subscribe("new-notification", (data) => {
+      const payload = data as { type?: string };
+      if (payload.type === "REPAIR_STATUS_CHANGED") {
+        setRefreshTick((t) => t + 1);
+      }
+    });
+  }, [subscribe]);
+
+  // add refreshTick to the main load effect deps
+  useEffect(() => {
+    // ...existing load effect...
+  }, [ready, selectedDate, weekStart, weekEnd, refreshTick]);
 
   // on mount: jump to earliest upcoming appointment, if any
   useEffect(() => {

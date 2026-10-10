@@ -139,6 +139,21 @@ def list_repair_queue(
     return {"items": items, "counts": counts}
 
 
+
+
+@router.get("/my-devices")
+def list_my_devices(request: Request):
+    user = _require_user(request)
+
+    if user.role != UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if user.id is None:
+        raise HTTPException(status_code=400, detail="User ID is required")
+
+    return rr_sql.list_devices_for_customer(user.id)
+
+
 @router.get("/{repair_request_id}")
 def get_repair(
     repair_request_id: int,
@@ -160,8 +175,14 @@ def get_repair(
 @router.get("/{repair_request_id}/notes")
 def list_repair_notes(repair_request_id: int, request: Request):
     user = _require_user(request)
+
+    # customers can read notes on their own repairs
     if user.role == UserRole.CUSTOMER:
-        raise HTTPException(status_code=403, detail="Forbidden")
+        detail = rr_sql.get_repair_detail(repair_request_id)
+        if detail is None:
+            raise HTTPException(status_code=404, detail="Repair not found")
+        if detail["customer_id"] != user.id:
+            raise HTTPException(status_code=403, detail="Forbidden")
 
     repair = note_sql.get_or_create_repair(repair_request_id)
     if repair is None or repair.id is None:
@@ -201,8 +222,13 @@ def add_repair_note(
 @router.get("/{repair_request_id}/parts")
 def list_repair_parts(repair_request_id: int, request: Request):
     user = _require_user(request)
+
     if user.role == UserRole.CUSTOMER:
-        raise HTTPException(status_code=403, detail="Forbidden")
+        detail = rr_sql.get_repair_detail(repair_request_id)
+        if detail is None:
+            raise HTTPException(status_code=404, detail="Repair not found")
+        if detail["customer_id"] != user.id:
+            raise HTTPException(status_code=403, detail="Forbidden")
 
     repair = note_sql.get_or_create_repair(repair_request_id)
     if repair is None or repair.id is None:

@@ -26,7 +26,7 @@ const dashboardPath = (path: string) => `${D.ROOT}/${path}`;
 const overviewItem = { label: "TODO:Overview", href: D.ROOT, icon: LayoutDashboard };
 const messagesItem = { label: "Messages", href: dashboardPath(D.MESSAGES), icon: MessageCircle };
 const appointmentsItem = { label: "Appointments", href: dashboardPath(D.APPOINTMENTS), icon: CalendarDays };
-const myDevicesItem = { label: "TODO:My Devices", href: dashboardPath(D.MY_DEVICES), icon: Monitor };
+const myDevicesItem = { label: "My Devices", href: dashboardPath(D.MY_DEVICES), icon: Monitor };
 const profileItem = { label: "Profile", href: dashboardPath(D.PROFILE), icon: UserRound };
 const administrationItem = { label: "Administration", href: dashboardPath(D.ADMINISTRATION), icon: ShieldCheck };
 const settingsItem = { label: "TODO:Settings", href: dashboardPath(D.SETTINGS), icon: Settings };

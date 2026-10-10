@@ -124,3 +124,17 @@ export interface RepairPartUsage {
   work_note: string | null;
   created_at: string;
 }
+
+
+export interface CustomerDevice {
+  id: number;
+  computer_name: string;
+  computer_type: ComputerType;
+  serial_number: string | null;
+  created_at: string;
+
+  repair_request_id: number | null;
+  repair_number: string | null;
+  repair_status: RepairQueueStatus | null;
+  estimate_amount: number | null;
+}

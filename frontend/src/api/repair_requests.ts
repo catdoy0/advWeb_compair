@@ -3,6 +3,7 @@ import type {
   Appointment,
   AppointmentCountsByDay,
   CreateRepairRequestPayload,
+  CustomerDevice,
   RepairDetail,
   RepairNote,
   RepairPartUsage,
@@ -214,4 +215,11 @@ export async function updateEstimate(
     return { ok: false, message };
   }
   return { ok: true, message: "Estimate updated." };
+}
+
+
+export async function listMyDevices(): Promise<CustomerDevice[]> {
+  const res = await apiFetch("repair-requests/my-devices", { method: "GET" });
+  if (!res.ok) return [];
+  return await res.json();
 }

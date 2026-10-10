@@ -466,6 +466,26 @@ def advance_repair_status(
 
         _ensure_repair_and_assign(s, repair_request_id, technician_id)
 
+        # sync appointment status with the workflow
+        if next_status_value == "RECEIVED":
+            s.execute(
+                text("""
+                    UPDATE appointments
+                    SET status = 'CONFIRMED', updated_at = :now
+                    WHERE repair_request_id = :rid AND status = 'PENDING'
+                """),
+                {"now": _now(), "rid": repair_request_id},
+            )
+        elif next_status_value == "RELEASED":
+            s.execute(
+                text("""
+                    UPDATE appointments
+                    SET status = 'COMPLETED', updated_at = :now
+                    WHERE repair_request_id = :rid AND status != 'COMPLETED'
+                """),
+                {"now": _now(), "rid": repair_request_id},
+            )
+
         s.commit()
         return next_status_value, req.customer_id
 
@@ -490,6 +510,17 @@ def reject_repair(
 
         _ensure_repair_and_assign(s, repair_request_id, technician_id)
 
+        # cancel any pending or confirmed appointment
+        s.execute(
+            text("""
+                UPDATE appointments
+                SET status = 'CANCELLED', updated_at = :now
+                WHERE repair_request_id = :rid
+                  AND status IN ('PENDING', 'CONFIRMED')
+            """),
+            {"now": _now(), "rid": repair_request_id},
+        )
+
         s.commit()
         return "REJECTED", req.customer_id
 
@@ -508,3 +539,55 @@ def set_estimate_amount(repair_request_id: int, amount: float) -> bool:
         repair.estimate_amount = amount
         s.commit()
         return True
+
+
+def list_devices_for_customer(customer_id: int) -> list[dict]:
+    """Every device owned by the customer, with its latest repair request if any."""
+    with Session(engine) as s:
+        rows = s.execute(
+            text("""
+                SELECT
+                    d.id,
+                    d.computer_name,
+                    d.computer_type,
+                    d.serial_number,
+                    d.created_at,
+                    rr.id            AS repair_request_id,
+                    rr.repair_number,
+                    rr.status        AS repair_status,
+                    rr.created_at    AS repair_created_at,
+                    r.estimate_amount
+                FROM devices d
+                LEFT JOIN LATERAL (
+                    SELECT *
+                    FROM repair_requests
+                    WHERE device_id = d.id
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ) rr ON TRUE
+                LEFT JOIN repairs r ON r.repair_request_id = rr.id
+                WHERE d.customer_id = :cid
+                ORDER BY d.created_at DESC
+            """),
+            {"cid": customer_id},
+        ).mappings().all()
+
+    result = []
+    for row in rows:
+        result.append({
+            "id": row["id"],
+            "computer_name": row["computer_name"],
+            "computer_type": row["computer_type"],
+            "serial_number": row["serial_number"],
+            "created_at": row["created_at"],
+            "repair_request_id": row["repair_request_id"],
+            "repair_number": row["repair_number"],
+            "repair_status": row["repair_status"],
+            "estimate_amount": (
+                float(row["estimate_amount"])
+                if row["estimate_amount"] is not None
+                else None
+            ),
+        })
+
+    return result
