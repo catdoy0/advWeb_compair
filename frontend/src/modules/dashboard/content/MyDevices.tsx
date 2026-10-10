@@ -97,9 +97,15 @@ export default function MyDevices() {
   }, [devices, search, typeFilter]);
 
   // reset to page 1 whenever the filter set changes
-  useEffect(() => {
+  function handleSearchChange(value: string) {
+    setSearch(value);
     setPage(1);
-  }, [search, typeFilter]);
+  }
+
+  function handleTypeFilterChange(value: string) {
+    setTypeFilter(value);
+    setPage(1);
+  }
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
@@ -211,7 +217,7 @@ export default function MyDevices() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search by name, serial number, or repair ID"
             className="h-10 w-full rounded-md border border-[#d8e0eb] bg-white pl-9 pr-3 text-[11px] text-[#102c50] outline-none placeholder:text-slate-400 focus:border-[#2870e8] dark:border-slate-600 dark:bg-[#182536] dark:text-white"
           />
@@ -219,7 +225,7 @@ export default function MyDevices() {
 
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          onChange={(e) => handleTypeFilterChange(e.target.value)}
           className="h-10 w-full rounded-md border border-[#d8e0eb] bg-white px-3 text-[11px] text-[#102c50] outline-none focus:border-[#2870e8] dark:border-slate-600 dark:bg-[#182536] dark:text-white"
         >
           <option value="">All types</option>

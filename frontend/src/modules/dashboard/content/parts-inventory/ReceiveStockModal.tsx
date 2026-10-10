@@ -20,11 +20,12 @@ interface ReceiveStockModalProps {
   onUpdated: () => void;
 }
 
-export default function ReceiveStockModal({
-  open,
-  onClose,
-  onUpdated,
-}: ReceiveStockModalProps) {
+export default function ReceiveStockModal(props: ReceiveStockModalProps) {
+  if (!props.open) return null;
+  return <ReceiveStockForm {...props} />;
+}
+
+function ReceiveStockForm({ open, onClose, onUpdated }: ReceiveStockModalProps) {
   const [parts, setParts] = useState<Part[]>([]);
   const [search, setSearch] = useState("");
   const [partId, setPartId] = useState<number | null>(null);
@@ -36,30 +37,17 @@ export default function ReceiveStockModal({
   const [messageModalMessage, setMessageModalMessage] = useState("");
   const [messageWasSuccess, setMessageWasSuccess] = useState(false);
 
-  // load parts when the modal opens
   useEffect(() => {
-    if (!open) return;
-
     let cancelled = false;
     (async () => {
       const data = await listParts();
       if (cancelled) return;
       setParts(data);
     })();
-
     return () => {
       cancelled = true;
     };
-  }, [open]);
-
-  // reset form when the modal opens
-  useEffect(() => {
-    if (!open) return;
-    setPartId(null);
-    setAmount(1);
-    setReference("");
-    setSearch("");
-  }, [open]);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -139,7 +127,6 @@ export default function ReceiveStockModal({
       </div>
 
       <div className="mt-4 space-y-4 border-t border-[#e6ebf2] pt-4 dark:border-slate-700">
-        {/* Part picker */}
         <div>
           <label className={labelClass}>Part</label>
 
@@ -200,7 +187,6 @@ export default function ReceiveStockModal({
           )}
         </div>
 
-        {/* Amount + reference */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelClass}>Quantity received</label>
