@@ -3,12 +3,17 @@ from datetime import date, datetime
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from src.models.enums import UserRole
+from src.schemas.repair_note import CreateNoteRequest
+from src.schemas.repair_part import AddPartRequest
 from src.schemas.repair_request import (
     CreateRepairRequestRequest,
     RepairRequestCreated,
+    UpdateEstimateRequest,
 )
 from src.services import notification as notif_service
 from src.services.auth import get_current_user_id
+from src.sql import repair_note as note_sql
+from src.sql import repair_part as rp_sql
 from src.sql import repair_request as rr_sql
 from src.sql.auth import get_user_by_id
 
@@ -149,3 +154,172 @@ def get_repair(
         raise HTTPException(status_code=403, detail="Forbidden")
 
     return detail
+
+
+
+@router.get("/{repair_request_id}/notes")
+def list_repair_notes(repair_request_id: int, request: Request):
+    user = _require_user(request)
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    repair = note_sql.get_or_create_repair(repair_request_id)
+    if repair is None or repair.id is None:
+        raise HTTPException(status_code=500, detail="Failed to resolve repair")
+
+    return note_sql.list_notes(repair.id)
+
+
+@router.post("/{repair_request_id}/notes")
+def add_repair_note(
+    repair_request_id: int,
+    body: CreateNoteRequest,
+    request: Request,
+):
+    user = _require_user(request)
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if user.id is None:
+        raise HTTPException(status_code=400, detail="User ID is required")
+
+    repair = note_sql.get_or_create_repair(repair_request_id)
+    if repair is None or repair.id is None:
+        raise HTTPException(status_code=500, detail="Failed to resolve repair")
+
+    note = note_sql.create_note(
+        repair_id=repair.id,
+        author_id=user.id,
+        note=body.note.strip(),
+    )
+
+    return {"id": note.id}
+
+
+# ---------- parts ----------
+
+@router.get("/{repair_request_id}/parts")
+def list_repair_parts(repair_request_id: int, request: Request):
+    user = _require_user(request)
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    repair = note_sql.get_or_create_repair(repair_request_id)
+    if repair is None or repair.id is None:
+        raise HTTPException(status_code=500, detail="Failed to resolve repair")
+
+    return rp_sql.list_parts_for_repair(repair.id)
+
+
+@router.post("/{repair_request_id}/parts")
+def add_repair_part(
+    repair_request_id: int,
+    body: AddPartRequest,
+    request: Request,
+):
+    user = _require_user(request)
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    repair = note_sql.get_or_create_repair(repair_request_id)
+    if repair is None or repair.id is None:
+        raise HTTPException(status_code=500, detail="Failed to resolve repair")
+
+    row, error = rp_sql.add_part_to_repair(
+        repair_id=repair.id,
+        part_id=body.part_id,
+        quantity_used=body.quantity_used,
+        work_note=body.work_note,
+    )
+
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+
+    return row
+
+
+@router.delete("/{repair_request_id}/parts/{repair_part_id}")
+def remove_repair_part(
+    repair_request_id: int,
+    repair_part_id: int,
+    request: Request,
+):
+    user = _require_user(request)
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    ok = rp_sql.remove_part_from_repair(repair_part_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Part usage not found")
+
+    return {"ok": True}
+
+
+
+@router.post("/{repair_request_id}/advance")
+async def advance_repair(repair_request_id: int, request: Request):
+    user = _require_user(request)
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    tech_id = user.id if user.role == UserRole.TECHNICIAN else None
+
+    new_status, customer_id = rr_sql.advance_repair_status(repair_request_id, tech_id)
+
+    if new_status is None or customer_id is None:
+        raise HTTPException(status_code=400, detail="This repair cannot be advanced further.")
+
+    detail = rr_sql.get_repair_detail(repair_request_id)
+    repair_number = detail["repair_number"] if detail else ""
+
+    await notif_service.notify_customer_status_changed(
+        customer_id=customer_id,
+        repair_request_id=repair_request_id,
+        repair_number=repair_number,
+        new_status=new_status,
+    )
+
+    return {"status": new_status}
+
+
+@router.post("/{repair_request_id}/reject")
+async def reject_repair(repair_request_id: int, request: Request):
+    user = _require_user(request)
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    tech_id = user.id if user.role == UserRole.TECHNICIAN else None
+
+    new_status, customer_id = rr_sql.reject_repair(repair_request_id, tech_id)
+
+    if new_status is None or customer_id is None:
+        raise HTTPException(status_code=400, detail="This repair cannot be rejected.")
+
+    detail = rr_sql.get_repair_detail(repair_request_id)
+    repair_number = detail["repair_number"] if detail else ""
+
+    await notif_service.notify_customer_status_changed(
+        customer_id=customer_id,
+        repair_request_id=repair_request_id,
+        repair_number=repair_number,
+        new_status=new_status,
+    )
+
+    return {"status": new_status}
+
+
+@router.patch("/{repair_request_id}/estimate")
+def update_estimate(
+    repair_request_id: int,
+    body: UpdateEstimateRequest,
+    request: Request,
+):
+    user = _require_user(request)
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    ok = rr_sql.set_estimate_amount(repair_request_id, float(body.amount))
+    if not ok:
+        raise HTTPException(status_code=400, detail="Failed to update estimate")
+
+    return {"amount": float(body.amount)}

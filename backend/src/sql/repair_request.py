@@ -11,6 +11,16 @@ from src.models.conversations import Conversations
 from src.models.devices import Devices
 from src.models.enums import AppointmentStatus, ComputerType, RepairRequestStatus
 from src.models.repair_requests import Repair_Requests
+from src.models.repairs import Repairs
+
+WORKFLOW_ORDER = [
+    "PENDING",
+    "RECEIVED",
+    "DIAGNOSING",
+    "REPAIRING",
+    "COMPLETED",
+    "RELEASED",
+]
 
 
 def _now() -> datetime:
@@ -407,3 +417,94 @@ def get_repair_detail(repair_request_id: int) -> dict | None:
         "appointment_date": row["appointment_date"],
         "appointment_time": row["appointment_time"],
     }
+
+
+
+
+def _ensure_repair_and_assign(
+    s,
+    repair_request_id: int,
+    technician_id: int | None,
+) -> None:
+    """Create the repairs row if missing and assign a technician when none is set."""
+    repair = s.exec(
+        select(Repairs).where(Repairs.repair_request_id == repair_request_id)
+    ).first()
+
+    if repair is None:
+        repair = Repairs(repair_request_id=repair_request_id)
+        s.add(repair)
+        s.flush()
+
+    if technician_id is not None and repair.technician_id is None:
+        repair.technician_id = technician_id
+
+
+
+
+def advance_repair_status(
+    repair_request_id: int,
+    technician_id: int | None = None,
+) -> tuple[str | None, int | None]:
+    with Session(engine) as s:
+        req = s.get(Repair_Requests, repair_request_id)
+        if req is None:
+            return None, None
+
+        current = req.status.value
+        if current not in WORKFLOW_ORDER:
+            return None, None
+
+        current_index = WORKFLOW_ORDER.index(current)
+        if current_index >= len(WORKFLOW_ORDER) - 1:
+            return None, None
+
+        next_status_value = WORKFLOW_ORDER[current_index + 1]
+
+        req.status = RepairRequestStatus(next_status_value)
+        req.updated_at = _now()
+
+        _ensure_repair_and_assign(s, repair_request_id, technician_id)
+
+        s.commit()
+        return next_status_value, req.customer_id
+
+
+TERMINAL_STATUSES = {"RELEASED", "REJECTED", "CANCELLED"}
+
+
+def reject_repair(
+    repair_request_id: int,
+    technician_id: int | None = None,
+) -> tuple[str | None, int | None]:
+    with Session(engine) as s:
+        req = s.get(Repair_Requests, repair_request_id)
+        if req is None:
+            return None, None
+
+        if req.status.value in TERMINAL_STATUSES:
+            return None, None
+
+        req.status = RepairRequestStatus.REJECTED
+        req.updated_at = _now()
+
+        _ensure_repair_and_assign(s, repair_request_id, technician_id)
+
+        s.commit()
+        return "REJECTED", req.customer_id
+
+
+def set_estimate_amount(repair_request_id: int, amount: float) -> bool:
+    """Manually set the estimate on the repairs row (creating it if needed)."""
+    with Session(engine) as s:
+        repair = s.exec(
+            select(Repairs).where(Repairs.repair_request_id == repair_request_id)
+        ).first()
+
+        if repair is None:
+            repair = Repairs(repair_request_id=repair_request_id)
+            s.add(repair)
+
+        repair.estimate_amount = amount
+        s.commit()
+        return True

@@ -2,6 +2,17 @@ from src.events import broadcaster
 from src.models.enums import NotificationType
 from src.sql import notification as notif_sql
 
+STATUS_LABEL = {
+    "PENDING": "Pending",
+    "RECEIVED": "Received",
+    "DIAGNOSING": "Diagnosing",
+    "REPAIRING": "Repairing",
+    "COMPLETED": "Completed",
+    "RELEASED": "Released",
+    "CANCELLED": "Cancelled",
+    "REJECTED": "Rejected",
+}
+
 
 async def notify_team_new_repair_request(
     repair_request_id: int,
@@ -37,5 +48,39 @@ async def notify_team_new_repair_request(
             "link": link,
             "reference_id": repair_request_id,
             "count": len(rows),
+        },
+    )
+
+
+async def notify_customer_status_changed(
+    customer_id: int,
+    repair_request_id: int,
+    repair_number: str,
+    new_status: str,
+) -> None:
+    """Notify the customer that their repair moved to a new status."""
+    label = STATUS_LABEL.get(new_status, new_status)
+    title = f"Repair {repair_number} · {label}"
+    body = f"Your repair is now {label.lower()}."
+    link = "/dashboard/appointments"
+
+    notif_sql.create_notifications(
+        user_ids=[customer_id],
+        type=NotificationType.REPAIR_STATUS_CHANGED,
+        title=title,
+        body=body,
+        link=link,
+        reference_id=repair_request_id,
+    )
+
+    await broadcaster.publish_to_users(
+        user_ids={customer_id},
+        event_type="new-notification",
+        data={
+            "type": NotificationType.REPAIR_STATUS_CHANGED.value,
+            "title": title,
+            "body": body,
+            "link": link,
+            "reference_id": repair_request_id,
         },
     )

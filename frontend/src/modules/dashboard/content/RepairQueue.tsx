@@ -26,6 +26,7 @@ const STATUS_TABS: { key: string; label: string }[] = [
   { key: "REPAIRING", label: "Repairing" },
   { key: "COMPLETED", label: "Completed" },
   { key: "RELEASED", label: "Released" },
+  { key: "REJECTED", label: "Rejected" },
 ];
 
 const STATUS_BADGE: Record<string, string> = {
@@ -35,6 +36,7 @@ const STATUS_BADGE: Record<string, string> = {
   COMPLETED: "bg-[#e6f5ef] text-[#15946a] dark:bg-[#1d4775] dark:text-[#00d68f]",
   RELEASED: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
   CANCELLED: "bg-[#fdecec] text-[#c0392b] dark:bg-[#3a1717] dark:text-[#f87171]",
+  REJECTED: "bg-[#fdecec] text-[#c0392b] dark:bg-[#3a1717] dark:text-[#f87171]",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -44,6 +46,7 @@ const STATUS_LABEL: Record<string, string> = {
   COMPLETED: "Completed",
   RELEASED: "Released",
   CANCELLED: "Cancelled",
+  REJECTED: "REJECTED",
 };
 
 function initialsOf(name: string): string {
@@ -72,6 +75,8 @@ export default function RepairQueue() {
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
+  const [refreshTick, setRefreshTick] = useState(0);
+
   // debounced fetch on filter + search change
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +93,9 @@ export default function RepairQueue() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [activeStatus, search]);
+  }, [activeStatus, search, refreshTick]);
+
+
 
   const columns: DataTableColumn<RepairQueueItem>[] = [
     {
@@ -203,10 +210,7 @@ export default function RepairQueue() {
         open={selectedId !== null}
         onClose={() => setSelectedId(null)}
         repairRequestId={selectedId}
-        onUpdated={() => {
-          // refresh the queue after a status change
-          // (for now, nothing — the modal doesn't mutate yet)
-        }}
+        onUpdated={() => setRefreshTick((t) => t + 1)}
       />
       <PageHeader
         eyebrow="Operations / repairs"

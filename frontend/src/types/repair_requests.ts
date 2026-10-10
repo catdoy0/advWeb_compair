@@ -50,7 +50,8 @@ export type RepairQueueStatus =
   | "REPAIRING"
   | "COMPLETED"
   | "RELEASED"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "REJECTED"
 
 export interface RepairQueueItem {
   id: number;
@@ -100,4 +101,26 @@ export interface RepairDetail {
 
   appointment_date: string | null;
   appointment_time: string | null;
+}
+
+
+export interface RepairNote {
+  id: number;
+  note: string;
+  created_at: string;
+  author_id: number;
+  author_name: string;
+  author_role: string;
+}
+
+export interface RepairPartUsage {
+  id: number;
+  part_id: number;
+  part_name: string;
+  part_sku: string;
+  quantity_used: number;
+  unit_price: number;
+  line_total: number;
+  work_note: string | null;
+  created_at: string;
 }

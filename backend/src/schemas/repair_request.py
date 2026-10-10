@@ -1,4 +1,5 @@
 from datetime import date, time
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 from src.models.enums import ComputerType
@@ -24,3 +25,6 @@ class RepairRequestCreated(BaseModel):
     repair_number: str
     appointment_id: int
     conversation_id: int
+
+class UpdateEstimateRequest(BaseModel):
+    amount: Decimal = Field(ge=0)

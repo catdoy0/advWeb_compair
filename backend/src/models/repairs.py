@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Float, SQLModel
 
 
 class Repairs(SQLModel, table=True):
@@ -21,7 +21,7 @@ class Repairs(SQLModel, table=True):
 
     diagnosis: str | None = None
 
-    estimate_amount: Decimal | None = Field(
+    estimate_amount: float | None = Field(
         default=None,
         decimal_places=2,
         max_digits=12,
@@ -36,5 +36,5 @@ class Repairs(SQLModel, table=True):
     started_at: datetime | None = None
     completed_at: datetime | None = None
 
-    created_at: datetime
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime | None = None
