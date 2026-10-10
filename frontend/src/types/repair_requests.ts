@@ -44,6 +44,7 @@ export type AppointmentCountsByDay = Record<string, number>;
 
 
 export type RepairQueueStatus =
+  | "PENDING"
   | "RECEIVED"
   | "DIAGNOSING"
   | "REPAIRING"

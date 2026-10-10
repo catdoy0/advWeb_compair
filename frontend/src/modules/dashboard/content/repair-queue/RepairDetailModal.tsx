@@ -3,7 +3,7 @@ import { ArrowRight, Check, FileText, Package } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
-import Modal from "../../../../components/common/modals/Modal";
+import RightSidebar from "../../../../components/common/modals/RightSideBar";
 import CommonButton from "../../../../components/common/widgets/CommonButton";
 import { getRepairDetail } from "../../../../api/repair_requests";
 import type {
@@ -13,7 +13,9 @@ import type {
 
 dayjs.extend(relativeTime);
 
+// Full workflow, including the pre-acceptance PENDING state.
 const WORKFLOW_STEPS: { key: RepairQueueStatus; label: string }[] = [
+  { key: "PENDING", label: "Pending" },
   { key: "RECEIVED", label: "Received" },
   { key: "DIAGNOSING", label: "Diagnosing" },
   { key: "REPAIRING", label: "Repairing" },
@@ -115,21 +117,21 @@ function RepairDetailContent({
 
   if (loading) {
     return (
-      <Modal open={open} onClose={onClose} className="max-w-2xl">
-        <p className="py-10 text-center text-[11px] text-slate-400">
+      <RightSidebar open={open} onClose={onClose}>
+        <p className="py-20 text-center text-[11px] text-slate-400">
           Loading repair...
         </p>
-      </Modal>
+      </RightSidebar>
     );
   }
 
   if (!detail) {
     return (
-      <Modal open={open} onClose={onClose} className="max-w-2xl">
-        <p className="py-10 text-center text-[11px] text-slate-400">
+      <RightSidebar open={open} onClose={onClose}>
+        <p className="py-20 text-center text-[11px] text-slate-400">
           Repair not found.
         </p>
-      </Modal>
+      </RightSidebar>
     );
   }
 
@@ -146,8 +148,49 @@ function RepairDetailContent({
     ? dayjs(detail.updated_at).fromNow()
     : dayjs(detail.created_at).fromNow();
 
+  const footer = (
+    <>
+      <div className="grid grid-cols-2 gap-2">
+        <CommonButton
+          variant="outline"
+          onClick={() => {
+            // TODO: open add-parts modal
+          }}
+          className="flex items-center justify-center gap-2 border-[#d4ddea] px-4 py-2"
+        >
+          <Package size={13} />
+          Add parts
+        </CommonButton>
+
+        <CommonButton
+          variant="outline"
+          onClick={() => {
+            // TODO: open add-note modal
+          }}
+          className="flex items-center justify-center gap-2 border-[#d4ddea] px-4 py-2"
+        >
+          <FileText size={13} />
+          Add note
+        </CommonButton>
+      </div>
+
+      {nextStep && (
+        <CommonButton
+          onClick={() => {
+            // TODO: POST /repair-requests/{id}/advance-status
+            console.log("advance to", nextStep.key);
+          }}
+          className="mt-2 flex w-full items-center justify-center gap-2 px-4 py-2.5"
+        >
+          Move to {nextStep.label}
+          <ArrowRight size={13} />
+        </CommonButton>
+      )}
+    </>
+  );
+
   return (
-    <Modal open={open} onClose={onClose} className="max-w-2xl">
+    <RightSidebar open={open} onClose={onClose} footer={footer}>
       {/* Header */}
       <div>
         <p className="text-[15px] font-bold text-[#102c50] dark:text-white">
@@ -166,7 +209,7 @@ function RepairDetailContent({
           </p>
           <span
             className={`inline-flex rounded px-2 py-1 text-[10px] font-bold ${
-              STATUS_BADGE[detail.status] ?? STATUS_BADGE.RECEIVED
+              STATUS_BADGE[detail.status] ?? STATUS_BADGE.PENDING
             }`}
           >
             {STATUS_LABEL[detail.status] ?? detail.status}
@@ -214,13 +257,7 @@ function RepairDetailContent({
                 </div>
 
                 <div className="min-w-0">
-                  <p
-                    className={`text-[12px] font-bold ${
-                      done || current
-                        ? "text-[#102c50] dark:text-white"
-                        : "text-[#102c50] dark:text-white"
-                    }`}
-                  >
+                  <p className="text-[12px] font-bold text-[#102c50] dark:text-white">
                     {step.label}
                   </p>
                   <p className="mt-0.5 text-[10px] text-slate-400">
@@ -292,47 +329,7 @@ function RepairDetailContent({
           </p>
         )}
       </div>
-
-      {/* Sticky footer */}
-      <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 border-t border-[#e5edf7] bg-white px-6 py-4 dark:border-slate-700 dark:bg-[#0f1724]">
-        <div className="grid grid-cols-2 gap-2">
-          <CommonButton
-            variant="outline"
-            onClick={() => {
-              // TODO: open add-parts modal
-            }}
-            className="flex items-center justify-center gap-2 border-[#d4ddea] px-4 py-2"
-          >
-            <Package size={13} />
-            Add parts
-          </CommonButton>
-
-          <CommonButton
-            variant="outline"
-            onClick={() => {
-              // TODO: open add-note modal
-            }}
-            className="flex items-center justify-center gap-2 border-[#d4ddea] px-4 py-2"
-          >
-            <FileText size={13} />
-            Add note
-          </CommonButton>
-        </div>
-
-        {nextStep && (
-          <CommonButton
-            onClick={() => {
-              // TODO: POST status advance
-              console.log("advance to", nextStep.key);
-            }}
-            className="mt-2 flex w-full items-center justify-center gap-2 px-4 py-2.5"
-          >
-            Move to {nextStep.label}
-            <ArrowRight size={13} />
-          </CommonButton>
-        )}
-      </div>
-    </Modal>
+    </RightSidebar>
   );
 }
 
@@ -350,9 +347,7 @@ function Field({
       <p className="text-[10px] text-slate-400">{label}</p>
       <p
         className={`mt-1 text-[12px] font-bold ${
-          muted
-            ? "text-slate-400"
-            : "text-[#102c50] dark:text-white"
+          muted ? "text-slate-400" : "text-[#102c50] dark:text-white"
         }`}
       >
         {value}

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowDownToLine, ChevronRight, Search } from "lucide-react";
+import {  ChevronRight, Search } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
-import CommonButton from "../../../components/common/widgets/CommonButton";
 import DataTable, {
   type DataTableColumn,
 } from "../../../components/common/widgets/DataTable";
@@ -21,6 +20,7 @@ dayjs.extend(relativeTime);
 
 const STATUS_TABS: { key: string; label: string }[] = [
   { key: "", label: "All" },
+  { key: "PENDING", label: "Pending" },
   { key: "RECEIVED", label: "Received" },
   { key: "DIAGNOSING", label: "Diagnosing" },
   { key: "REPAIRING", label: "Repairing" },

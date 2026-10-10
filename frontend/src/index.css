@@ -62,3 +62,13 @@ html {
 .modal-open {
   animation: modal-open 233ms;
 }
+
+
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 220ms ease-out;
+}
