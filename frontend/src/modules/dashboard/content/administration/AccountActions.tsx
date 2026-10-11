@@ -1,4 +1,4 @@
-import { Archive, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import type { Account } from "./types";
 
 export default function AccountActions({

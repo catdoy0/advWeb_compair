@@ -18,6 +18,13 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 
+COOKIE_OPTIONS = {
+    "httponly": True,
+    "secure": False,
+    "samesite": "lax",
+}
+
+
 def validate_config():
     required = {
         "DATABASE_URL": DATABASE_URL,

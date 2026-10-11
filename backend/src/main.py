@@ -35,11 +35,12 @@ app.title = "compair backend"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "https://com-pair.web.app", "https://ruper.dpdns.org"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 app.include_router(authRouter, prefix="/auth")
 app.include_router(adminRouter, prefix="/administration")

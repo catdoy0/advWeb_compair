@@ -280,6 +280,7 @@ export default function TestComponent() {
                 breadcrumbs={["Compair", "My repairs"]}
                 statusLabel="Live workspace"
                 userInitials="MS"
+                onMenuClick={() => {}}
               />
             </div>
           </ShowcaseSection>
@@ -297,7 +298,7 @@ export default function TestComponent() {
                   },
                 ]}
                 activeHref="#"
-                user={{ initials: "MS", name: "Mika Santos" }}
+                user={{ initials: "MS", name: "Mika Santos", role: "CUSTOMER" }}
                 onLogout={() => {}}
               />
             </div>

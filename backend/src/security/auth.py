@@ -1,7 +1,11 @@
 from fastapi import HTTPException, Request, Response
 from jwt import PyJWTError
 
-from src.config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
+from src.config import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    COOKIE_OPTIONS,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+)
 from src.models.users import UserRole
 from src.security.tokens import decode_access_token
 from src.services.auth import refresh_session
@@ -48,9 +52,7 @@ def check_user_role(
         new_access_token,
         max_age=ACCESS_MAX_AGE,
         path="/",
-        httponly=True,
-        secure=False,
-        samesite="lax",
+        **COOKIE_OPTIONS
     )
 
     response.set_cookie(
@@ -58,9 +60,8 @@ def check_user_role(
         refresh_token,
         max_age=REFRESH_MAX_AGE,
         path="/",
-        httponly=True,
-        secure=False,
-        samesite="lax",
+        **COOKIE_OPTIONS
     )
+
 
     return user.role in allowed_roles

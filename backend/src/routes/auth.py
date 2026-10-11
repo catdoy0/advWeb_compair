@@ -1,7 +1,11 @@
 from fastapi import APIRouter, HTTPException, Request, Response
 from jwt import PyJWTError
 
-from src.config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
+from src.config import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    COOKIE_OPTIONS,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+)
 from src.schemas.auth import CheckEmailRequest, LoginRequest, SignUpRequest
 from src.security.tokens import decode_access_token
 from src.services.auth import (
@@ -15,12 +19,6 @@ from src.sql import auth as auth_sql
 
 router = APIRouter()
 
-
-COOKIE_OPTIONS = {
-    "httponly": True,
-    "secure": False,
-    "samesite": "lax",
-}
 
 ACCESS_MAX_AGE = ACCESS_TOKEN_EXPIRE_MINUTES * 60
 REFRESH_MAX_AGE = REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60

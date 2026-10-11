@@ -12,10 +12,10 @@ from src.sql.auth import get_user_by_id
 
 router = APIRouter()
 
-PING_INTERVAL_SECONDS = 60
+PING_INTERVAL_SECONDS = 45
 
 
-@router.get("/")
+@router.get("")
 async def events(request: Request):
     user_id = get_current_user_id(request)
     if user_id is None:
@@ -68,4 +68,13 @@ async def events(request: Request):
         finally:
             broadcaster.unsubscribe(sub)
 
-    return EventSourceResponse(stream())
+
+    # return EventSourceResponse(stream())
+    return EventSourceResponse(
+        stream(),
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )

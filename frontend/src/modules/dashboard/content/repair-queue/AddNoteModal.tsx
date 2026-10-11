@@ -30,11 +30,9 @@ export default function AddNoteModal({
   const [submitting, setSubmitting] = useState(false);
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [messageModalMessage, setMessageModalMessage] = useState("");
-  const [messageWasSuccess, setMessageWasSuccess] = useState(false);
 
-  function showMessage(message: string, success: boolean) {
+  function showMessage(message: string) {
     setMessageModalMessage(message);
-    setMessageWasSuccess(success);
     setMessageModalOpen(true);
   }
 
@@ -42,7 +40,7 @@ export default function AddNoteModal({
     if (submitting) return;
     const trimmed = note.trim();
     if (!trimmed) {
-      showMessage("Note cannot be empty.", false);
+      showMessage("Note cannot be empty.");
       return;
     }
 
@@ -50,7 +48,7 @@ export default function AddNoteModal({
     try {
       const result = await addRepairNote(repairRequestId, trimmed);
       if (!result.ok) {
-        showMessage(result.message, false);
+        showMessage(result.message);
         return;
       }
 
