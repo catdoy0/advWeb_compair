@@ -181,6 +181,60 @@ def customer_overview(request: Request):
     return rr_sql.get_customer_overview(user.id)
 
 
+@router.get("/by-number/{repair_number}")
+def get_repair_by_number(repair_number: str, request: Request):
+    user = _require_user(request)
+
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    detail = rr_sql.get_repair_detail_by_number(repair_number.strip().upper())
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Repair not found")
+
+    return detail
+
+
+@router.get("/pos-recent")
+def list_pos_recent(request: Request):
+    user = _require_user(request)
+
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return rr_sql.list_recent_repairs_for_pos()
+
+
+@router.post("/{repair_request_id}/checkout")
+async def checkout_repair_route(repair_request_id: int, request: Request):
+    """Release the repair — the customer has picked it up."""
+    user = _require_user(request)
+
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    detail = rr_sql.get_repair_detail(repair_request_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Repair not found")
+
+    new_status, customer_id = rr_sql.checkout_repair(repair_request_id)
+
+    if new_status is None or customer_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Repair cannot be checked out in its current state.",
+        )
+
+    await notif_service.notify_customer_status_changed(
+        customer_id=customer_id,
+        repair_request_id=repair_request_id,
+        repair_number=detail["repair_number"],
+        new_status=new_status,
+    )
+
+    return {"status": new_status}
+
+
 
 @router.get("/{repair_request_id}")
 def get_repair(

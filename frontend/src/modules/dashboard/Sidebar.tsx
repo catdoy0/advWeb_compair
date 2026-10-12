@@ -7,6 +7,7 @@ interface DashboardSidebarProps {
   activeHref: string
   userInitials: string
   userName: string
+  unreadMessages: number
   open: boolean;
   onClose: () => void;
   onLogout: () => void
@@ -17,13 +18,19 @@ export default function DashboardSidebar({
   activeHref,
   userInitials,
   userName,
+  unreadMessages,
   onClose,
   open,
   onLogout,
 }: DashboardSidebarProps) {
   return (
     <CommonDashboardSidebar
-      sections={dashboardSectionsByRole[role]}
+      sections={dashboardSectionsByRole[role].map((section) => ({
+        ...section,
+        items: section.items.map((item) =>
+          item.label === "Messages" ? { ...item, badge: unreadMessages } : item,
+        ),
+      }))}
       activeHref={activeHref}
       user={{
         initials: userInitials,

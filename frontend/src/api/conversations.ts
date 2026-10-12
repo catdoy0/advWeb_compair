@@ -73,3 +73,13 @@ export async function sendMessage(
   if (!res.ok) return null;
   return await res.json();
 }
+
+
+export async function markConversationRead(
+  conversationId: number,
+): Promise<boolean> {
+  const res = await apiFetch(`conversations/${conversationId}/read`, {
+    method: "POST",
+  });
+  return res.ok;
+}

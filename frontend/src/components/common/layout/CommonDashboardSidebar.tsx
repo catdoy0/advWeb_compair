@@ -9,6 +9,7 @@ export interface DashboardSidebarItem {
   label: string
   href: string
   icon: LucideIcon
+  badge?: number
 }
 
 export interface DashboardSidebarSection {
@@ -127,7 +128,15 @@ export default function CommonDashboardSidebar({
                       `}
                     >
                       <Icon size={15} strokeWidth={1.8} />
-                      <span>{item.label}</span>
+                      <span className="min-w-0 flex-1">{item.label}</span>
+                      {item.badge !== undefined && item.badge > 0 && (
+                        <span
+                          aria-label={`${item.badge} unread messages`}
+                          className="min-w-5 rounded-full bg-blue-500/30 px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-white"
+                        >
+                          {item.badge > 99 ? "99+" : item.badge}
+                        </span>
+                      )}
                     </Link>
                   )
                 })}

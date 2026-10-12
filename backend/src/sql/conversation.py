@@ -1,14 +1,11 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, select
 
 from src.database import engine
 from src.models.conversations import Conversations
 from src.models.messages import Messages
-from src.models.repair_requests import Repair_Requests
-from src.models.users import Users
 
 
 def _now() -> datetime:
@@ -81,7 +78,7 @@ def touch_conversation(conversation_id: int) -> None:
 
 
 
-def list_conversations_for_team() -> list[dict]:
+def list_conversations_for_team(user_id: int) -> list[dict]:
     """All threads, newest activity first. Includes customer + repair context + last message."""
     with Session(engine) as s:
         rows = s.execute(text("""
@@ -95,7 +92,8 @@ def list_conversations_for_team() -> list[dict]:
                 u.email,
                 rr.repair_number,
                 d.computer_name,
-                m.content AS last_message
+                m.content AS last_message,
+                unread.count AS unread_count
             FROM conversations c
             JOIN users u ON u.id = c.customer_id
             LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
@@ -107,8 +105,18 @@ def list_conversations_for_team() -> list[dict]:
                 ORDER BY created_at DESC
                 LIMIT 1
             ) m ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*) AS count
+                FROM messages unread_message
+                LEFT JOIN conversation_reads cr
+                    ON cr.conversation_id = c.id AND cr.user_id = :uid
+                WHERE unread_message.conversation_id = c.id
+                  AND unread_message.sender_id != :uid
+                  AND (cr.last_read_message_id IS NULL
+                       OR unread_message.id > cr.last_read_message_id)
+            ) unread ON TRUE
             ORDER BY c.last_message_at DESC
-        """)).mappings().all()
+        """), {"uid": user_id}).mappings().all()
             # WHERE NOT EXISTS (
             #     SELECT 1 FROM users u2
             #     WHERE u2.id = c.customer_id
@@ -128,6 +136,7 @@ def list_conversations_for_team() -> list[dict]:
             "repair_number": row["repair_number"],
             "computer_name": row["computer_name"],
             "last_message": row["last_message"],
+            "unread_count": row["unread_count"],
         })
 
     return result_list
@@ -144,7 +153,8 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
                 c.last_message_at,
                 rr.repair_number,
                 d.computer_name,
-                m.content AS last_message
+                m.content AS last_message,
+                unread.count AS unread_count
             FROM conversations c
             LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
             LEFT JOIN devices d          ON d.id = rr.device_id
@@ -155,6 +165,16 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
                 ORDER BY created_at DESC
                 LIMIT 1
             ) m ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*) AS count
+                FROM messages unread_message
+                LEFT JOIN conversation_reads cr
+                    ON cr.conversation_id = c.id AND cr.user_id = :cid
+                WHERE unread_message.conversation_id = c.id
+                  AND unread_message.sender_id != :cid
+                  AND (cr.last_read_message_id IS NULL
+                       OR unread_message.id > cr.last_read_message_id)
+            ) unread ON TRUE
             WHERE c.customer_id = :cid
             ORDER BY c.repair_request_id IS NULL DESC, c.last_message_at DESC
         """), {"cid": customer_id}).mappings().all()
@@ -169,6 +189,7 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
             "repair_number": row["repair_number"],
             "computer_name": row["computer_name"],
             "last_message": row["last_message"],
+            "unread_count": row["unread_count"],
         })
 
     return result_list
@@ -237,3 +258,44 @@ def insert_message(
         s.commit()
         s.refresh(msg)
         return msg
+
+
+def get_unread_count_for_customer(customer_id: int) -> int:
+    with Session(engine) as s:
+        return s.execute(text("""
+            SELECT COUNT(*)
+            FROM messages m
+            JOIN conversations c ON c.id = m.conversation_id
+            LEFT JOIN conversation_reads cr
+                ON cr.conversation_id = c.id
+               AND cr.user_id = :cid
+            WHERE c.customer_id = :cid
+              AND m.sender_id != :cid
+              AND (cr.last_read_message_id IS NULL OR m.id > cr.last_read_message_id)
+        """), {"cid": customer_id}).scalar_one()
+
+
+def mark_conversation_read(conversation_id: int, user_id: int) -> None:
+    with Session(engine) as s:
+        latest = s.execute(text("""
+            SELECT MAX(id) FROM messages WHERE conversation_id = :cid
+        """), {"cid": conversation_id}).scalar_one()
+
+        if latest is None:
+            return
+
+        s.execute(text("""
+            INSERT INTO conversation_reads
+                (conversation_id, user_id, last_read_message_id, updated_at)
+            VALUES (:cid, :uid, :mid, :now)
+            ON CONFLICT (conversation_id, user_id)
+            DO UPDATE SET
+                last_read_message_id = EXCLUDED.last_read_message_id,
+                updated_at = EXCLUDED.updated_at
+        """), {
+            "cid": conversation_id,
+            "uid": user_id,
+            "mid": latest,
+            "now": _now(),
+        })
+        s.commit()

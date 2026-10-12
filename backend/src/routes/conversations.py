@@ -1,12 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, Field
 
 from src.events import broadcaster
 from src.models.users import UserRole
 from src.schemas.conversation import (
-    ConversationDetail,
-    ConversationSummary,
-    MessageOut,
     SendMessageRequest,
 )
 from src.services.auth import get_current_user_id
@@ -44,7 +40,7 @@ def list_conversations(request: Request):
         conv_sql.get_or_create_general_conversation(user.id)
         rows = conv_sql.list_conversations_for_customer(user.id)
     else:
-        rows = conv_sql.list_conversations_for_team()
+        rows = conv_sql.list_conversations_for_team(user.id) # type: ignore
 
     result = []
     for row in rows:
@@ -58,7 +54,7 @@ def list_conversations(request: Request):
             "repair_number": row["repair_number"],
             "device_label": row["computer_name"],
             "preview": row["last_message"],
-            "unread_count": 0,
+            "unread_count": row["unread_count"],
         })
 
     if user.role != UserRole.CUSTOMER:
@@ -90,6 +86,23 @@ def get_conversation(conversation_id: int, request: Request):
         "last_message_at": conv.last_message_at,
     }
 
+
+@router.post("/{conversation_id}/read")
+def mark_read(conversation_id: int, request: Request):
+    user = _require_user(request)
+
+    conv = conv_sql.get_conversation(conversation_id)
+    if conv is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if user.role == UserRole.CUSTOMER and conv.customer_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if user.id is None:
+        raise HTTPException(status_code=400, detail="User ID required")
+
+    conv_sql.mark_conversation_read(conversation_id, user.id)
+    return {"ok": True}
 
 
 @router.get("/{conversation_id}/messages")

@@ -18,6 +18,7 @@ import DashboardPage from "../../components/DashboardPage";
 
 import { getCustomerOverview } from "../../../../api/repair_requests";
 import type { CustomerOverview as OverviewData } from "../../../../types/repair_requests";
+import { useEvents } from "../../../../context/EventContext";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pending",
@@ -40,9 +41,18 @@ const APPT_STATUS_LABEL: Record<string, string> = {
 
 export default function CustomerOverview() {
   const navigate = useNavigate();
+  const { subscribe } = useEvents();
 
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    return subscribe("new-message", () => {
+      getCustomerOverview().then((res) => {
+        if (res) setData(res);
+      });
+    });
+  }, [subscribe]);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +88,7 @@ export default function CustomerOverview() {
   }
 
   return (
-    <DashboardPage maxWidth="1180px" className="bg-[#f7f9fc] dark:bg-[#0f1724]">
+    <DashboardPage maxWidth="1240px" className="bg-[#f7f9fc] dark:bg-[#0f1724]">
       <PageHeader
         eyebrow="Computer repair customer portal"
         title="Your computer repair overview"
@@ -133,6 +143,8 @@ export default function CustomerOverview() {
           value={String(unreadMessages)}
           icon={MessageCircle}
           variant="cyan"
+          detail={unreadMessages > 0 ? "New messages" : "All caught up"}
+          onClick={() => navigate("/dashboard/messages")}
         />
 
         <StatCard

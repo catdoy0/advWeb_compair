@@ -1,4 +1,5 @@
 from src.models.appointments import Appointments
+from src.models.conversation_reads import Conversation_Reads
 from src.models.conversations import Conversations
 from src.models.devices import Devices
 from src.models.enums import (
@@ -25,6 +26,7 @@ __all__ = [
     "AppointmentStatus",
     "Appointments",
     "ComputerType",
+    "Conversation_Reads",
     "Conversations",
     "Devices",
     "Messages",

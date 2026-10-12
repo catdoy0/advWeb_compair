@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from "react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "../context/AuthContext";
 import DashboardSidebar from "../modules/dashboard/Sidebar";
@@ -10,18 +10,53 @@ import { getNavLabel } from "../modules/dashboard/DashboardNav";
 import { useTitle } from "../hooks/useTitle";
 import { useLoading } from "../context/LoadingContext";
 import LoadingScreen from "../components/common/LoadingScreen";
+import { listConversations } from "../api/conversations";
+import type { Conversation } from "../types/messages";
+import { useEvents } from "../context/EventContext";
 
 export default function DashboardPage() {
   const { isLoading } = useLoading();
 
   const [isAreYouSureModalOpen, setIsAreYouSureModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const { session, logout } = useAuth();
   const { pathname } = useLocation();
+  const { subscribe } = useEvents();
 
   const currentSession = session ?? dummySession;
   const { user } = currentSession;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refreshUnreadMessages() {
+      try {
+        const conversations: Conversation[] = await listConversations();
+        if (cancelled) return;
+        const total = conversations.reduce(
+          (count, conversation) => count + conversation.unread_count,
+          0,
+        );
+        setUnreadMessages(total);
+      } catch (error) {
+        console.error("Failed to load unread message count", error);
+      }
+    }
+
+    void refreshUnreadMessages();
+    const unsubscribe = subscribe("new-message", () => {
+      void refreshUnreadMessages();
+    });
+    window.addEventListener("conversations-read", refreshUnreadMessages);
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      window.removeEventListener("conversations-read", refreshUnreadMessages);
+    };
+  }, [pathname, subscribe, user.id]);
 
   const hasName = Boolean(user.firstName || user.lastName);
   const fullName = hasName
@@ -48,6 +83,7 @@ export default function DashboardPage() {
           activeHref={pathname}
           userInitials={initials}
           userName={fullName}
+          unreadMessages={unreadMessages}
           onLogout={() => setIsAreYouSureModalOpen(true)}
           onClose={() => setSidebarOpen(false)}
           open={sidebarOpen}

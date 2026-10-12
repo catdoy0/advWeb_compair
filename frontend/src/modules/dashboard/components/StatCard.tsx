@@ -7,6 +7,7 @@ interface StatCardProps {
   variant: "blue" | "orange" | "cyan";
   detail?: string;
   detailMuted?: string;
+  onClick?: () => void;
 }
 
 export default function StatCard({
@@ -16,6 +17,7 @@ export default function StatCard({
   variant,
   detail,
   detailMuted,
+  onClick,
 }: StatCardProps) {
   const iconStyles = {
     blue: "bg-blue-50 text-blue-600",
@@ -25,7 +27,16 @@ export default function StatCard({
 
   return (
     <div
-      className="
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (onClick && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      className={`
         rounded-lg
         border
         border-[#dce4ee]
@@ -33,7 +44,8 @@ export default function StatCard({
         p-4
         dark:border-slate-800
         dark:bg-slate-900
-      "
+        ${onClick ? "cursor-pointer transition-colors hover:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500" : ""}
+      `}
     >
       <div className="flex items-start justify-between">
         <p className="text-[10px] font-medium text-slate-500">

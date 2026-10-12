@@ -12,6 +12,7 @@ import { dummySession } from "../../../dummyData";
 import {
   listConversations,
   listMessages,
+  markConversationRead,
   sendMessage,
 } from "../../../api/conversations";
 import { useMessageEvents } from "../../../hooks/useMessageEvents";
@@ -83,6 +84,26 @@ export default function Messages() {
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const [atBottom, setAtBottom] = useState(true);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadConversations() {
+      try {
+        const data = await listConversations();
+        if (cancelled) return;
+        setConversations(data);
+      } catch (error) {
+        console.error("Failed to load conversations", error);
+        if (!cancelled) setConversations([]);
+      }
+    }
+
+    void loadConversations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function isNearBottom(el: HTMLDivElement, threshold = 80): boolean {
     return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
   }
@@ -94,19 +115,7 @@ export default function Messages() {
     el.scrollTop = el.scrollHeight;
   }, [messages, atBottom]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const data = await listConversations();
-      if (cancelled) return;
-      setConversations(data);
-      if (data.length > 0) setSelectedId(data[0].id);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  // load message
   useEffect(() => {
     if (selectedId === null) return;
 
@@ -115,6 +124,13 @@ export default function Messages() {
       const data = await listMessages(selectedId);
       if (cancelled) return;
       setMessages([...data].reverse());
+      setConversations((current) => current.map((conversation) =>
+        conversation.id === selectedId
+          ? { ...conversation, unread_count: 0 }
+          : conversation,
+      ));
+      await markConversationRead(selectedId);
+      window.dispatchEvent(new Event("conversations-read"));
     })();
 
     return () => {
@@ -127,10 +143,14 @@ export default function Messages() {
       const list = await listConversations();
       setConversations(list);
 
-      if (conversationId === selectedId) {
-        const data = await listMessages(conversationId);
-        setMessages([...data].reverse());
-      }
+      if (conversationId !== selectedId) return;
+
+      const data = await listMessages(conversationId);
+      setMessages([...data].reverse());
+      await markConversationRead(conversationId);
+      window.dispatchEvent(new Event("conversations-read"));
+      const refreshedList = await listConversations();
+      setConversations(refreshedList);
     },
     [selectedId],
   );
@@ -170,6 +190,10 @@ export default function Messages() {
 
   const selectedConversation =
     conversations.find((c) => c.id === selectedId) ?? null;
+  const unreadTotal = conversations.reduce(
+    (total, conversation) => total + conversation.unread_count,
+    0,
+  );
 
   return (
     <DashboardPage className="mb-6 pb-15">
@@ -189,8 +213,9 @@ export default function Messages() {
                   Inbox
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  {conversations.length} conversation
-                  {conversations.length === 1 ? "" : "s"}
+                  {unreadTotal > 0
+                    ? `${unreadTotal} unread message${unreadTotal === 1 ? "" : "s"}`
+                    : `${conversations.length} conversation${conversations.length === 1 ? "" : "s"}`}
                 </p>
               </div>
               <span className="rounded bg-[#eef4ff] dark:bg-[#0b213d] px-2 py-0.5 text-xs font-semibold text-[#2870e8] dark:text-[#8ec5ff]">
@@ -252,6 +277,12 @@ export default function Messages() {
                     <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">
                       {conv.preview || "No messages yet"}
                     </p>
+                    {conv.unread_count > 0 && (
+                      <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+                        {conv.unread_count} new
+                      </span>
+                    )}
                   </div>
 
                   <ChevronRight

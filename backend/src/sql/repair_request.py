@@ -12,6 +12,7 @@ from src.models.devices import Devices
 from src.models.enums import AppointmentStatus, ComputerType, RepairRequestStatus
 from src.models.repair_requests import Repair_Requests
 from src.models.repairs import Repairs
+from src.sql import conversation as conv_sql
 
 WORKFLOW_ORDER = [
     "PENDING",
@@ -23,6 +24,8 @@ WORKFLOW_ORDER = [
 ]
 
 WORKSPACE_ACTIVE_STATUSES = ("RECEIVED", "DIAGNOSING", "REPAIRING", "COMPLETED")
+
+
 
 
 def _now() -> datetime:
@@ -798,11 +801,150 @@ def get_customer_overview(customer_id: int) -> dict:
             "is_from_team": is_from_team,
         }
 
+    unread = conv_sql.get_unread_count_for_customer(customer_id)
+
     return {
         "active_request": active_out,
         "next_appointment": appt_out,
-        "unread_messages": 0,  # TODO: wire up read tracking
+        "unread_messages": unread,
         "computer_count": computer_count,
         "last_message": msg_out,
         "recent_requests": [dict(r) for r in recent],
     }
+
+
+def get_repair_detail_by_number(repair_number: str) -> dict | None:
+    """Same shape as get_repair_detail, but looked up by repair_number."""
+    with Session(engine) as s:
+        row = s.execute(
+            text("""
+                SELECT
+                    rr.id,
+                    rr.repair_number,
+                    rr.status,
+                    rr.created_at,
+                    rr.updated_at,
+                    rr.requested_service,
+                    rr.reported_problem,
+                    rr.contact_detail,
+                    d.computer_name,
+                    d.computer_type,
+                    d.serial_number,
+                    u.id            AS customer_id,
+                    u.first_name    AS customer_first,
+                    u.last_name     AS customer_last,
+                    u.email         AS customer_email,
+                    t.id            AS technician_id,
+                    t.first_name    AS technician_first,
+                    t.last_name     AS technician_last,
+                    r.diagnosis,
+                    r.estimate_amount,
+                    r.final_amount,
+                    a.scheduled_date AS appointment_date,
+                    a.scheduled_time AS appointment_time
+                FROM repair_requests rr
+                JOIN users u ON u.id = rr.customer_id
+                JOIN devices d ON d.id = rr.device_id
+                LEFT JOIN repairs r ON r.repair_request_id = rr.id
+                LEFT JOIN users t ON t.id = r.technician_id
+                LEFT JOIN appointments a ON a.repair_request_id = rr.id
+                WHERE rr.repair_number = :num
+                ORDER BY a.scheduled_date ASC
+                LIMIT 1
+            """),
+            {"num": repair_number},
+        ).mappings().first()
+
+    if row is None:
+        return None
+
+    customer_name = " ".join(
+        p for p in [row["customer_first"], row["customer_last"]] if p
+    ).strip() or row["customer_email"]
+
+    technician_name = None
+    if row["technician_id"] is not None:
+        technician_name = " ".join(
+            p for p in [row["technician_first"], row["technician_last"]] if p
+        ).strip() or None
+
+    return {
+        "id": row["id"],
+        "repair_number": row["repair_number"],
+        "status": row["status"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "computer_name": row["computer_name"],
+        "computer_type": row["computer_type"],
+        "serial_number": row["serial_number"],
+        "requested_service": row["requested_service"],
+        "reported_problem": row["reported_problem"],
+        "contact_detail": row["contact_detail"],
+        "customer_id": row["customer_id"],
+        "customer_name": customer_name,
+        "customer_email": row["customer_email"],
+        "technician_id": row["technician_id"],
+        "technician_name": technician_name,
+        "diagnosis": row["diagnosis"],
+        "estimate_amount": (
+            float(row["estimate_amount"]) if row["estimate_amount"] is not None else None
+        ),
+        "final_amount": (
+            float(row["final_amount"]) if row["final_amount"] is not None else None
+        ),
+        "appointment_date": row["appointment_date"],
+        "appointment_time": row["appointment_time"],
+    }
+
+
+def list_recent_repairs_for_pos(limit: int = 6) -> list[dict]:
+    """Most recent active repairs — the quick-pick list on the POS screen."""
+    with Session(engine) as s:
+        rows = s.execute(
+            text("""
+                SELECT
+                    rr.id,
+                    rr.repair_number,
+                    rr.status
+                FROM repair_requests rr
+                WHERE rr.status IN ('RECEIVED', 'DIAGNOSING', 'REPAIRING', 'COMPLETED')
+                ORDER BY rr.updated_at DESC NULLS LAST, rr.created_at DESC
+                LIMIT :lim
+            """),
+            {"lim": limit},
+        ).mappings().all()
+
+    return [dict(r) for r in rows]
+
+
+def checkout_repair(repair_request_id: int) -> tuple[str | None, int | None]:
+    """
+    Release the repair and mark the appointment completed.
+    Returns (new_status, customer_id) on success, (None, None) if invalid.
+    """
+    with Session(engine) as s:
+        req = s.get(Repair_Requests, repair_request_id)
+        if req is None:
+            return None, None
+
+        if req.status.value == "RELEASED":
+            return None, None
+
+        if req.status.value not in ("COMPLETED", "REPAIRING"):
+            return None, None
+
+        req.status = RepairRequestStatus.RELEASED
+        req.updated_at = _now()
+        s.commit()
+
+        s.execute(
+            text("""
+                UPDATE appointments
+                SET status = 'COMPLETED', updated_at = :now
+                WHERE repair_request_id = :rid AND status != 'COMPLETED'
+            """),
+            {"now": _now(), "rid": repair_request_id},
+        )
+        s.commit()
+
+        return "RELEASED", req.customer_id

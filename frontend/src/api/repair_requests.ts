@@ -239,3 +239,48 @@ export async function getCustomerOverview(): Promise<CustomerOverview | null> {
   if (!res.ok) return null;
   return await res.json();
 }
+
+
+export interface POSRecentRepair {
+  id: number;
+  repair_number: string;
+  status: string;
+}
+
+export async function getRepairByNumber(
+  repairNumber: string,
+): Promise<RepairDetail | null> {
+  const res = await apiFetch(
+    `repair-requests/by-number/${encodeURIComponent(repairNumber.trim())}`,
+    { method: "GET" },
+  );
+  if (!res.ok) return null;
+  return await res.json();
+}
+
+export async function listPosRecent(): Promise<POSRecentRepair[]> {
+  const res = await apiFetch("repair-requests/pos-recent", { method: "GET" });
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+export async function checkoutRepair(
+  id: number,
+): Promise<{ ok: boolean; message: string }> {
+  const res = await apiFetch(`repair-requests/${id}/checkout`, {
+    method: "POST",
+  });
+
+  if (!res.ok) {
+    let message = "Failed to check out repair.";
+    try {
+      const data = await res.json();
+      if (data.detail) message = data.detail;
+    } catch {
+      /* no body */
+    }
+    return { ok: false, message };
+  }
+
+  return { ok: true, message: "Repair released." };
+}

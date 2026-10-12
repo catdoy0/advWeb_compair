@@ -2,8 +2,6 @@ import { useAuth } from "../../../context/AuthContext";
 import CustomerOverview from "./Overview/CustomerOverview";
 
 import { dummySession } from "../../../dummyData";
-import TechnicianOverview from "./Overview/TechnicianOverview";
-import StaffOverview from "./Overview/StaffOverview";
 import AdminOverview from "./Overview/AdminOverview";
 
 
@@ -33,13 +31,13 @@ export default function Overview() {
     return <CustomerOverview />;
   }
 
-  if (role === "TECHNICIAN") {
-    return <TechnicianOverview />;
-  }
-
-  if (role === "STAFF") {
-    return <StaffOverview />;
-  }
+  // if (role === "TECHNICIAN") {
+  //   return <TechnicianOverview />;
+  // }
+  //
+  // if (role === "STAFF") {
+  //   return <StaffOverview />;
+  // }
 
   if (role === "ADMIN") {
     return <AdminOverview />;
