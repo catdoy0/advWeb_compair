@@ -22,6 +22,8 @@ WORKFLOW_ORDER = [
     "RELEASED",
 ]
 
+WORKSPACE_ACTIVE_STATUSES = ("RECEIVED", "DIAGNOSING", "REPAIRING", "COMPLETED")
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -588,6 +590,102 @@ def list_devices_for_customer(customer_id: int) -> list[dict]:
                 if row["estimate_amount"] is not None
                 else None
             ),
+        })
+
+    return result
+
+
+def get_workspace_summary(technician_id: int) -> dict:
+    with Session(engine) as s:
+        assigned = s.execute(text("""
+            SELECT COUNT(*)
+            FROM repairs r
+            JOIN repair_requests rr ON rr.id = r.repair_request_id
+            WHERE r.technician_id = :tid
+              AND rr.status IN ('RECEIVED', 'DIAGNOSING', 'REPAIRING', 'COMPLETED')
+        """), {"tid": technician_id}).scalar_one()
+
+        diagnosing = s.execute(text("""
+            SELECT COUNT(*)
+            FROM repairs r
+            JOIN repair_requests rr ON rr.id = r.repair_request_id
+            WHERE r.technician_id = :tid
+              AND rr.status = 'DIAGNOSING'
+        """), {"tid": technician_id}).scalar_one()
+
+        parts_on_hand = s.execute(text("""
+            SELECT COALESCE(SUM(quantity), 0) FROM parts WHERE is_active = true
+        """)).scalar_one()
+
+        completed_today = s.execute(text("""
+            SELECT COUNT(*)
+            FROM repairs r
+            JOIN repair_requests rr ON rr.id = r.repair_request_id
+            WHERE r.technician_id = :tid
+              AND rr.status = 'COMPLETED'
+              AND rr.updated_at >= CURRENT_DATE
+        """), {"tid": technician_id}).scalar_one()
+
+    return {
+        "assigned_devices": assigned,
+        "diagnosing": diagnosing,
+        "parts_on_hand": parts_on_hand,
+        "completed_today": completed_today,
+    }
+
+
+def list_assigned_repairs(technician_id: int) -> list[dict]:
+    """Repairs assigned to this technician, active workflow only."""
+    with Session(engine) as s:
+        rows = s.execute(text("""
+            SELECT
+                rr.id,
+                rr.repair_number,
+                rr.status,
+                rr.reported_problem,
+                rr.created_at,
+                d.computer_name,
+                u.id            AS customer_id,
+                u.first_name,
+                u.last_name,
+                u.email,
+                a.scheduled_date AS due_date,
+                a.scheduled_time AS due_time,
+                (
+                    SELECT COUNT(*)
+                    FROM repair_parts rp
+                    WHERE rp.repair_id = r.id
+                ) AS parts_used_count
+            FROM repair_requests rr
+            JOIN repairs r ON r.repair_request_id = rr.id
+            JOIN devices d ON d.id = rr.device_id
+            JOIN users u ON u.id = rr.customer_id
+            LEFT JOIN appointments a ON a.repair_request_id = rr.id
+            WHERE r.technician_id = :tid
+              AND rr.status IN ('RECEIVED', 'DIAGNOSING', 'REPAIRING', 'COMPLETED')
+            ORDER BY a.scheduled_date ASC NULLS LAST,
+                     a.scheduled_time ASC NULLS LAST,
+                     rr.created_at ASC
+        """), {"tid": technician_id}).mappings().all()
+
+    result = []
+    for row in rows:
+        customer_name = " ".join(
+            p for p in [row["first_name"], row["last_name"]] if p
+        ).strip() or row["email"]
+
+        result.append({
+            "id": row["id"],
+            "repair_number": row["repair_number"],
+            "status": row["status"],
+            "reported_problem": row["reported_problem"],
+            "created_at": row["created_at"],
+            "computer_name": row["computer_name"],
+            "customer_id": row["customer_id"],
+            "customer_name": customer_name,
+            "due_date": row["due_date"],
+            "due_time": row["due_time"],
+            "parts_used_count": row["parts_used_count"],
         })
 
     return result

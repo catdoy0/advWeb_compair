@@ -9,6 +9,7 @@ import type {
   RepairPartUsage,
   RepairQueueResponse,
   RepairRequestCreated,
+  WorkspaceResponse,
 } from "../types/repair_requests";
 
 export async function createRepairRequest(
@@ -221,5 +222,12 @@ export async function updateEstimate(
 export async function listMyDevices(): Promise<CustomerDevice[]> {
   const res = await apiFetch("repair-requests/my-devices", { method: "GET" });
   if (!res.ok) return [];
+  return await res.json();
+}
+
+
+export async function getWorkspace(): Promise<WorkspaceResponse | null> {
+  const res = await apiFetch("repair-requests/workspace", { method: "GET" });
+  if (!res.ok) return null;
   return await res.json();
 }

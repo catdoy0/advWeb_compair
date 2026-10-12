@@ -138,3 +138,30 @@ export interface CustomerDevice {
   repair_status: RepairQueueStatus | null;
   estimate_amount: number | null;
 }
+
+
+export interface WorkspaceSummary {
+  assigned_devices: number;
+  diagnosing: number;
+  parts_on_hand: number;
+  completed_today: number;
+}
+
+export interface AssignedRepair {
+  id: number;
+  repair_number: string;
+  status: RepairQueueStatus;
+  reported_problem: string;
+  created_at: string;
+  computer_name: string;
+  customer_id: number;
+  customer_name: string;
+  due_date: string | null;
+  due_time: string | null;
+  parts_used_count: number;
+}
+
+export interface WorkspaceResponse {
+  summary: WorkspaceSummary;
+  items: AssignedRepair[];
+}

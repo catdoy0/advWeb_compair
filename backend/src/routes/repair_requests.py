@@ -139,8 +139,6 @@ def list_repair_queue(
     return {"items": items, "counts": counts}
 
 
-
-
 @router.get("/my-devices")
 def list_my_devices(request: Request):
     user = _require_user(request)
@@ -152,6 +150,23 @@ def list_my_devices(request: Request):
         raise HTTPException(status_code=400, detail="User ID is required")
 
     return rr_sql.list_devices_for_customer(user.id)
+
+
+@router.get("/workspace")
+def get_workspace(request: Request):
+    user = _require_user(request)
+
+    if user.role != UserRole.TECHNICIAN:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if user.id is None:
+        raise HTTPException(status_code=400, detail="User ID is required")
+
+    summary = rr_sql.get_workspace_summary(user.id)
+    items = rr_sql.list_assigned_repairs(user.id)
+
+    return {"summary": summary, "items": items}
+
 
 
 @router.get("/{repair_request_id}")
