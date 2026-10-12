@@ -1,77 +1,77 @@
-import { ArrowRight } from "lucide-react";
-import CommonButton from "../../../components/common/widgets/CommonButton";
 import { useNavigate } from "react-router";
+import { ArrowRight, MessageCircle } from "lucide-react";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 
-export default function MessageShop() {
+import DashboardPanel from "../components/DashboardPanel";
+import type { CustomerOverviewLastMessage } from "../../../types/repair_requests";
+
+dayjs.extend(relativeTime);
+
+export default function MessageShop({
+  lastMessage,
+  loading,
+}: {
+  lastMessage: CustomerOverviewLastMessage | null;
+  loading: boolean;
+}) {
   const navigate = useNavigate();
+
   return (
-    <section
-      className="
-        overflow-hidden
-        rounded-lg
-        border
-        border-[#dce4ee]
-        bg-white
-        dark:border-slate-800
-        dark:bg-slate-900
-      "
-    >
-      <div className="border-b border-[#e5ebf3] px-4 py-3 dark:border-slate-800">
-        <h2 className="text-sm font-bold text-[#17385f] dark:text-white">
-          Message the shop
-        </h2>
-
-        <p className="mt-1 text-[10px] text-slate-400">
-          Ask about your device or share a concern.
-        </p>
-      </div>
-
-      <div className="p-4">
-        <div className="flex items-start gap-3">
-          <div
-            className="
-              flex
-              h-8
-              w-8
-              shrink-0
-              items-center
-              justify-center
-              rounded-full
-              bg-blue-100
-              text-[9px]
-              font-bold
-              text-blue-600
-            "
-          >
-            CT
-          </div>
-
-          <div>
-            <p className="text-[11px] font-semibold text-[#17385f] dark:text-white">
-              Can I pick it up today?
-            </p>
-
-            <p className="mt-1 text-[9px] text-slate-400">
-              10:42 AM
-            </p>
-          </div>
-        </div>
-
-        <CommonButton
-          className="
-            mt-4
-            flex
-            w-full
-            items-center
-            justify-center
-            gap-2
-          "
-            onClick={() => navigate("/dashboard/messages")}
+    <DashboardPanel
+      title="Messages"
+      description="Direct line to the Compair team."
+      headerAction={
+        <button
+          type="button"
+          onClick={() => navigate("/dashboard/messages")}
+          className="flex items-center gap-1 text-[10px] font-semibold text-[#2870e8] hover:underline"
         >
-          Open messages
-          <ArrowRight size={13} />
-        </CommonButton>
+          Open
+          <ArrowRight size={11} />
+        </button>
+      }
+    >
+      <div className="p-5">
+        {loading ? (
+          <p className="py-6 text-center text-[11px] text-slate-400">
+            Loading...
+          </p>
+        ) : lastMessage ? (
+          <>
+            <p className="text-[10px] font-semibold text-slate-400">
+              {lastMessage.sender_name}
+            </p>
+            <p className="mt-1 line-clamp-3 text-[12px] leading-5 text-[#102c50] dark:text-white">
+              {lastMessage.content}
+            </p>
+            <p className="mt-3 text-[9px] text-slate-400">
+              {dayjs(lastMessage.created_at).fromNow()}
+            </p>
+          </>
+        ) : (
+          <div className="flex flex-col items-center py-6 text-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eef4ff] text-[#2870e8]">
+              <MessageCircle size={16} />
+            </div>
+            <p className="mt-3 text-[12px] font-semibold text-[#102c50] dark:text-white">
+              No messages yet
+            </p>
+            <p className="mt-1 text-[10px] text-slate-400">
+              Start a conversation with the shop.
+            </p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => navigate("/dashboard/messages")}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-md border border-[#d4ddea] px-4 py-2 text-[11px] font-semibold text-[#2870e8] transition-colors hover:bg-[#f8fafc] dark:border-slate-700 dark:hover:bg-[#162334]"
+        >
+          <MessageCircle size={13} />
+          Message the shop
+        </button>
       </div>
-    </section>
+    </DashboardPanel>
   );
 }

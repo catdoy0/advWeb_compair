@@ -689,3 +689,120 @@ def list_assigned_repairs(technician_id: int) -> list[dict]:
         })
 
     return result
+
+
+def get_customer_overview(customer_id: int) -> dict:
+    with Session(engine) as s:
+        # active request — most recent non-terminal
+        active = s.execute(text("""
+            SELECT
+                rr.repair_number,
+                rr.status,
+                rr.reported_problem,
+                d.computer_name
+            FROM repair_requests rr
+            JOIN devices d ON d.id = rr.device_id
+            WHERE rr.customer_id = :cid
+              AND rr.status NOT IN ('RELEASED', 'REJECTED', 'CANCELLED')
+            ORDER BY rr.created_at DESC
+            LIMIT 1
+        """), {"cid": customer_id}).mappings().first()
+
+        # next upcoming appointment
+        appt = s.execute(text("""
+            SELECT
+                a.scheduled_date,
+                a.scheduled_time,
+                a.status,
+                d.computer_name
+            FROM appointments a
+            JOIN repair_requests rr ON rr.id = a.repair_request_id
+            JOIN devices d ON d.id = rr.device_id
+            WHERE rr.customer_id = :cid
+              AND a.scheduled_date >= CURRENT_DATE
+              AND a.status IN ('PENDING', 'CONFIRMED')
+            ORDER BY a.scheduled_date ASC, a.scheduled_time ASC
+            LIMIT 1
+        """), {"cid": customer_id}).mappings().first()
+
+        # computer count
+        computer_count = s.execute(text("""
+            SELECT COUNT(*) FROM devices WHERE customer_id = :cid
+        """), {"cid": customer_id}).scalar_one()
+
+        # last message in the customer's general conversation
+        last_message = s.execute(text("""
+            SELECT
+                m.content,
+                m.created_at,
+                u.first_name,
+                u.last_name,
+                u.role
+            FROM messages m
+            JOIN conversations c ON c.id = m.conversation_id
+            JOIN users u ON u.id = m.sender_id
+            WHERE c.customer_id = :cid
+              AND c.repair_request_id IS NULL
+            ORDER BY m.created_at DESC
+            LIMIT 1
+        """), {"cid": customer_id}).mappings().first()
+
+        # recent requests for the list
+        recent = s.execute(text("""
+            SELECT
+                rr.id,
+                rr.repair_number,
+                rr.status,
+                rr.created_at,
+                rr.reported_problem,
+                d.computer_name
+            FROM repair_requests rr
+            JOIN devices d ON d.id = rr.device_id
+            WHERE rr.customer_id = :cid
+            ORDER BY rr.created_at DESC
+            LIMIT 5
+        """), {"cid": customer_id}).mappings().all()
+
+    # build active
+    active_out = None
+    if active is not None:
+        active_out = {
+            "repair_number": active["repair_number"],
+            "status": active["status"],
+            "computer_name": active["computer_name"],
+            "reported_problem": active["reported_problem"],
+        }
+
+    # build appointment
+    appt_out = None
+    if appt is not None:
+        appt_out = {
+            "scheduled_date": appt["scheduled_date"],
+            "scheduled_time": appt["scheduled_time"],
+            "status": appt["status"],
+            "computer_name": appt["computer_name"],
+        }
+
+    # build last message
+    msg_out = None
+    if last_message is not None:
+        sender_name = " ".join(
+            p for p in [last_message["first_name"], last_message["last_name"]] if p
+        ).strip() or "Compair"
+        is_from_team = last_message["role"] != "CUSTOMER"
+
+        msg_out = {
+            "content": last_message["content"],
+            "created_at": last_message["created_at"],
+            "sender_name": "Compair Team" if is_from_team else sender_name,
+            "is_from_team": is_from_team,
+        }
+
+    return {
+        "active_request": active_out,
+        "next_appointment": appt_out,
+        "unread_messages": 0,  # TODO: wire up read tracking
+        "computer_count": computer_count,
+        "last_message": msg_out,
+        "recent_requests": [dict(r) for r in recent],
+    }

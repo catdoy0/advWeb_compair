@@ -4,6 +4,7 @@ import type {
   AppointmentCountsByDay,
   CreateRepairRequestPayload,
   CustomerDevice,
+  CustomerOverview,
   RepairDetail,
   RepairNote,
   RepairPartUsage,
@@ -228,6 +229,13 @@ export async function listMyDevices(): Promise<CustomerDevice[]> {
 
 export async function getWorkspace(): Promise<WorkspaceResponse | null> {
   const res = await apiFetch("repair-requests/workspace", { method: "GET" });
+  if (!res.ok) return null;
+  return await res.json();
+}
+
+
+export async function getCustomerOverview(): Promise<CustomerOverview | null> {
+  const res = await apiFetch("repair-requests/overview", { method: "GET" });
   if (!res.ok) return null;
   return await res.json();
 }

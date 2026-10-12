@@ -168,6 +168,19 @@ def get_workspace(request: Request):
     return {"summary": summary, "items": items}
 
 
+@router.get("/overview")
+def customer_overview(request: Request):
+    user = _require_user(request)
+
+    if user.role != UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if user.id is None:
+        raise HTTPException(status_code=400, detail="User ID is required")
+
+    return rr_sql.get_customer_overview(user.id)
+
+
 
 @router.get("/{repair_request_id}")
 def get_repair(

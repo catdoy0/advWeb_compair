@@ -165,3 +165,43 @@ export interface WorkspaceResponse {
   summary: WorkspaceSummary;
   items: AssignedRepair[];
 }
+
+
+export interface CustomerOverviewActiveRequest {
+  repair_number: string;
+  status: RepairQueueStatus;
+  computer_name: string;
+  reported_problem: string;
+}
+
+export interface CustomerOverviewAppointment {
+  scheduled_date: string;
+  scheduled_time: string;
+  status: AppointmentStatus;
+  computer_name: string;
+}
+
+export interface CustomerOverviewLastMessage {
+  content: string;
+  created_at: string;
+  sender_name: string;
+  is_from_team: boolean;
+}
+
+export interface CustomerOverviewRecentRequest {
+  id: number;
+  repair_number: string;
+  status: RepairQueueStatus;
+  created_at: string;
+  reported_problem: string;
+  computer_name: string;
+}
+
+export interface CustomerOverview {
+  active_request: CustomerOverviewActiveRequest | null;
+  next_appointment: CustomerOverviewAppointment | null;
+  unread_messages: number;
+  computer_count: number;
+  last_message: CustomerOverviewLastMessage | null;
+  recent_requests: CustomerOverviewRecentRequest[];
+}
