@@ -68,7 +68,7 @@ export default function SignInFormSection() {
             type="email"
             placeholder="Enter email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value.toLocaleLowerCase())}
             className={`${error ? "!border-red-500" : ""}`}
           />
 

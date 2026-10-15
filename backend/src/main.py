@@ -55,4 +55,4 @@ app.include_router(partsRouter, prefix="/parts")
 
 @app.get("/")
 def root():
-    return JSONResponse(status_code=200, content={"message" : "🗿"}) 
+    return JSONResponse(status_code=200, content={"message" : "🗿"})

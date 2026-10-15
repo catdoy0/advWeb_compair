@@ -23,7 +23,7 @@ import { ROUTES } from "../../routes";
 const D = ROUTES.DASHBOARD;
 const dashboardPath = (path: string) => `${D.ROOT}/${path}`;
 
-const overviewItem = { label: "TODO:Overview", href: D.ROOT, icon: LayoutDashboard };
+const overviewItem = { label: "Overview", href: D.ROOT, icon: LayoutDashboard };
 const messagesItem = { label: "Messages", href: dashboardPath(D.MESSAGES), icon: MessageCircle };
 const appointmentsItem = { label: "Appointments", href: dashboardPath(D.APPOINTMENTS), icon: CalendarDays };
 const myDevicesItem = { label: "My Devices", href: dashboardPath(D.MY_DEVICES), icon: Monitor };
@@ -35,7 +35,7 @@ const archiveItem = { label: "TODO:Archive", href: dashboardPath(D.ARCHIVE), ico
 const workspaceItem = { label: "Workspace", href: dashboardPath(D.WORKSPACE), icon: LayoutDashboard };
 const repairQueueItem = { label: "Repair Queue", href: dashboardPath(D.REPAIR_QUEUE), icon: Wrench };
 const partsInventoryItem = { label: "Parts Inventory", href: dashboardPath(D.PARTS_INVENTORY), icon: Package };
-const posItem = { label: "TODO:POS", href: dashboardPath(D.POS), icon: ShoppingCart };
+const posItem = { label: "POS", href: dashboardPath(D.POS), icon: ShoppingCart };
 const customersItem = { label: "TODO:Customers", href: dashboardPath(D.CUSTOMERS), icon: Users };
 const devicesItem = { label: "TODO:Devices", href: dashboardPath(D.DEVICES), icon: Monitor };
 const techniciansItem = { label: "TODO:Technicians", href: dashboardPath(D.TECHNICIANS), icon: UserCog };
@@ -72,7 +72,6 @@ const adminSections: DashboardSidebarSection[] = [
       overviewItem,
       repairQueueItem,
       messagesItem,
-      posItem,
       appointmentsItem,
       customersItem,
       devicesItem,

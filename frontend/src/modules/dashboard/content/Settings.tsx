@@ -20,12 +20,6 @@ interface NotificationOption {
 
 const notificationOptions: NotificationOption[] = [
   {
-    id: "customer-messages",
-    title: "Customer messages",
-    description:
-      "Allow the team to respond to repair questions from the inbox.",
-  },
-  {
     id: "low-stock-alerts",
     title: "Low-stock alerts",
     description:

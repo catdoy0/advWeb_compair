@@ -61,7 +61,7 @@ def signup_user(data: SignUpRequest) -> tuple[Users, str, str]:
 
 
 def signin_user(data: LoginRequest) -> tuple[Users, str, str]:
-    user = auth_sql.get_user_by_email(data.email)
+    user = auth_sql.get_user_by_email(data.email.lower())
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -120,3 +120,16 @@ def get_current_user_id(request: Request) -> int | None:
         return int(claims["sub"])
     except Exception:
         return None
+
+
+def require_active_user(request: Request) -> Users:
+    """Return the authenticated active user or raise the standard auth error."""
+    user_id = get_current_user_id(request)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    user = auth_sql.get_user_by_id(user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is unavailable")
+
+    return user

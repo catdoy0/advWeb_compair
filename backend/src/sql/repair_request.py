@@ -2,7 +2,6 @@ import secrets
 from datetime import date, datetime, time, timezone
 
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, select
 
 from src.database import engine
@@ -23,11 +22,6 @@ WORKFLOW_ORDER = [
     "RELEASED",
 ]
 
-WORKSPACE_ACTIVE_STATUSES = ("RECEIVED", "DIAGNOSING", "REPAIRING", "COMPLETED")
-
-
-
-
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -35,6 +29,15 @@ def _now() -> datetime:
 def _generate_repair_number() -> str:
     # CP-XXXXXX (6 hex chars, ~16M combos)
     return f"CP-{secrets.token_hex(3).upper()}"
+
+
+def _person_name(
+    first_name: str | None,
+    last_name: str | None,
+    fallback: str | None = None,
+) -> str | None:
+    name = " ".join(part for part in (first_name, last_name) if part).strip()
+    return name or fallback
 
 
 
@@ -298,15 +301,15 @@ def list_repair_queue(status: str | None, search: str) -> list[dict]:
 
     result = []
     for row in rows:
-        customer_name = " ".join(
-            p for p in [row["first_name"], row["last_name"]] if p
-        ).strip() or row["email"]
+        customer_name = _person_name(
+            row["first_name"], row["last_name"], row["email"]
+        )
 
         technician_name = None
         if row["technician_id"] is not None:
-            technician_name = " ".join(
-                p for p in [row["technician_first"], row["technician_last"]] if p
-            ).strip() or None
+            technician_name = _person_name(
+                row["technician_first"], row["technician_last"]
+            )
 
         result.append({
             "id": row["id"],
@@ -348,56 +351,16 @@ def count_repair_queue_by_status() -> dict[str, int]:
     return counts
 
 
-def get_repair_detail(repair_request_id: int) -> dict | None:
-    with Session(engine) as s:
-        row = s.execute(text("""
-            SELECT
-                rr.id,
-                rr.repair_number,
-                rr.status,
-                rr.created_at,
-                rr.updated_at,
-                rr.requested_service,
-                rr.reported_problem,
-                rr.contact_detail,
-                d.computer_name,
-                d.computer_type,
-                d.serial_number,
-                u.id            AS customer_id,
-                u.first_name    AS customer_first,
-                u.last_name     AS customer_last,
-                u.email         AS customer_email,
-                t.id            AS technician_id,
-                t.first_name    AS technician_first,
-                t.last_name     AS technician_last,
-                r.diagnosis,
-                r.estimate_amount,
-                r.final_amount,
-                a.scheduled_date AS appointment_date,
-                a.scheduled_time AS appointment_time
-            FROM repair_requests rr
-            JOIN users u ON u.id = rr.customer_id
-            JOIN devices d ON d.id = rr.device_id
-            LEFT JOIN repairs r ON r.repair_request_id = rr.id
-            LEFT JOIN users t ON t.id = r.technician_id
-            LEFT JOIN appointments a ON a.repair_request_id = rr.id
-            WHERE rr.id = :id
-            ORDER BY a.scheduled_date ASC
-            LIMIT 1
-        """), {"id": repair_request_id}).mappings().first()
-
-    if row is None:
-        return None
-
-    customer_name = " ".join(
-        p for p in [row["customer_first"], row["customer_last"]] if p
-    ).strip() or row["customer_email"]
+def _serialize_repair_detail(row) -> dict:
+    customer_name = _person_name(
+        row["customer_first"], row["customer_last"], row["customer_email"]
+    )
 
     technician_name = None
     if row["technician_id"] is not None:
-        technician_name = " ".join(
-            p for p in [row["technician_first"], row["technician_last"]] if p
-        ).strip() or None
+        technician_name = _person_name(
+            row["technician_first"], row["technician_last"]
+        )
 
     return {
         "id": row["id"],
@@ -417,13 +380,61 @@ def get_repair_detail(repair_request_id: int) -> dict | None:
         "technician_id": row["technician_id"],
         "technician_name": technician_name,
         "diagnosis": row["diagnosis"],
-        "estimate_amount": float(row["estimate_amount"]) if row["estimate_amount"] is not None else None,
-        "final_amount": float(row["final_amount"]) if row["final_amount"] is not None else None,
+        "estimate_amount": (
+            float(row["estimate_amount"]) if row["estimate_amount"] is not None else None
+        ),
+        "final_amount": (
+            float(row["final_amount"]) if row["final_amount"] is not None else None
+        ),
         "appointment_date": row["appointment_date"],
         "appointment_time": row["appointment_time"],
     }
 
 
+def _get_repair_detail(column: str, value: int | str) -> dict | None:
+    # The column is selected only by the internal ID/number wrappers below.
+    with Session(engine) as s:
+        row = s.execute(text(f"""
+            SELECT
+                rr.id,
+                rr.repair_number,
+                rr.status,
+                rr.created_at,
+                rr.updated_at,
+                rr.requested_service,
+                rr.reported_problem,
+                rr.contact_detail,
+                d.computer_name,
+                d.computer_type,
+                d.serial_number,
+                u.id AS customer_id,
+                u.first_name AS customer_first,
+                u.last_name AS customer_last,
+                u.email AS customer_email,
+                t.id AS technician_id,
+                t.first_name AS technician_first,
+                t.last_name AS technician_last,
+                r.diagnosis,
+                r.estimate_amount,
+                r.final_amount,
+                a.scheduled_date AS appointment_date,
+                a.scheduled_time AS appointment_time
+            FROM repair_requests rr
+            JOIN users u ON u.id = rr.customer_id
+            JOIN devices d ON d.id = rr.device_id
+            LEFT JOIN repairs r ON r.repair_request_id = rr.id
+            LEFT JOIN users t ON t.id = r.technician_id
+            LEFT JOIN appointments a ON a.repair_request_id = rr.id
+            WHERE rr.{column} = :value
+            ORDER BY a.scheduled_date ASC
+            LIMIT 1
+        """), {"value": value}).mappings().first()
+
+    return _serialize_repair_detail(row) if row is not None else None
+
+
+def get_repair_detail(repair_request_id: int) -> dict | None:
+    return _get_repair_detail("id", repair_request_id)
 
 
 def _ensure_repair_and_assign(
@@ -673,9 +684,9 @@ def list_assigned_repairs(technician_id: int) -> list[dict]:
 
     result = []
     for row in rows:
-        customer_name = " ".join(
-            p for p in [row["first_name"], row["last_name"]] if p
-        ).strip() or row["email"]
+        customer_name = _person_name(
+            row["first_name"], row["last_name"], row["email"]
+        )
 
         result.append({
             "id": row["id"],
@@ -789,9 +800,9 @@ def get_customer_overview(customer_id: int) -> dict:
     # build last message
     msg_out = None
     if last_message is not None:
-        sender_name = " ".join(
-            p for p in [last_message["first_name"], last_message["last_name"]] if p
-        ).strip() or "Compair"
+        sender_name = _person_name(
+            last_message["first_name"], last_message["last_name"], "Compair"
+        )
         is_from_team = last_message["role"] != "CUSTOMER"
 
         msg_out = {
@@ -814,87 +825,8 @@ def get_customer_overview(customer_id: int) -> dict:
 
 
 def get_repair_detail_by_number(repair_number: str) -> dict | None:
-    """Same shape as get_repair_detail, but looked up by repair_number."""
-    with Session(engine) as s:
-        row = s.execute(
-            text("""
-                SELECT
-                    rr.id,
-                    rr.repair_number,
-                    rr.status,
-                    rr.created_at,
-                    rr.updated_at,
-                    rr.requested_service,
-                    rr.reported_problem,
-                    rr.contact_detail,
-                    d.computer_name,
-                    d.computer_type,
-                    d.serial_number,
-                    u.id            AS customer_id,
-                    u.first_name    AS customer_first,
-                    u.last_name     AS customer_last,
-                    u.email         AS customer_email,
-                    t.id            AS technician_id,
-                    t.first_name    AS technician_first,
-                    t.last_name     AS technician_last,
-                    r.diagnosis,
-                    r.estimate_amount,
-                    r.final_amount,
-                    a.scheduled_date AS appointment_date,
-                    a.scheduled_time AS appointment_time
-                FROM repair_requests rr
-                JOIN users u ON u.id = rr.customer_id
-                JOIN devices d ON d.id = rr.device_id
-                LEFT JOIN repairs r ON r.repair_request_id = rr.id
-                LEFT JOIN users t ON t.id = r.technician_id
-                LEFT JOIN appointments a ON a.repair_request_id = rr.id
-                WHERE rr.repair_number = :num
-                ORDER BY a.scheduled_date ASC
-                LIMIT 1
-            """),
-            {"num": repair_number},
-        ).mappings().first()
-
-    if row is None:
-        return None
-
-    customer_name = " ".join(
-        p for p in [row["customer_first"], row["customer_last"]] if p
-    ).strip() or row["customer_email"]
-
-    technician_name = None
-    if row["technician_id"] is not None:
-        technician_name = " ".join(
-            p for p in [row["technician_first"], row["technician_last"]] if p
-        ).strip() or None
-
-    return {
-        "id": row["id"],
-        "repair_number": row["repair_number"],
-        "status": row["status"],
-        "created_at": row["created_at"],
-        "updated_at": row["updated_at"],
-        "computer_name": row["computer_name"],
-        "computer_type": row["computer_type"],
-        "serial_number": row["serial_number"],
-        "requested_service": row["requested_service"],
-        "reported_problem": row["reported_problem"],
-        "contact_detail": row["contact_detail"],
-        "customer_id": row["customer_id"],
-        "customer_name": customer_name,
-        "customer_email": row["customer_email"],
-        "technician_id": row["technician_id"],
-        "technician_name": technician_name,
-        "diagnosis": row["diagnosis"],
-        "estimate_amount": (
-            float(row["estimate_amount"]) if row["estimate_amount"] is not None else None
-        ),
-        "final_amount": (
-            float(row["final_amount"]) if row["final_amount"] is not None else None
-        ),
-        "appointment_date": row["appointment_date"],
-        "appointment_time": row["appointment_time"],
-    }
+    """Look up repair detail by its public repair number."""
+    return _get_repair_detail("repair_number", repair_number)
 
 
 def list_recent_repairs_for_pos(limit: int = 6) -> list[dict]:

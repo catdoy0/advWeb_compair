@@ -11,7 +11,7 @@ from src.schemas.repair_request import (
     UpdateEstimateRequest,
 )
 from src.services import notification as notif_service
-from src.services.auth import get_current_user_id
+from src.services.auth import require_active_user as _require_user
 from src.sql import repair_note as note_sql
 from src.sql import repair_part as rp_sql
 from src.sql import repair_request as rr_sql
@@ -21,17 +21,6 @@ router = APIRouter()
 
 DAY_CAPACITY = 6
 
-
-def _require_user(request: Request):
-    user_id = get_current_user_id(request)
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    user = get_user_by_id(user_id)
-    if user is None or not user.is_active:
-        raise HTTPException(status_code=403, detail="Account is unavailable")
-
-    return user
 
 def _validate_preferred_datetime(body: CreateRepairRequestRequest):
     now = datetime.now()

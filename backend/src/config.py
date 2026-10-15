@@ -17,11 +17,15 @@ FORGET_PASS_EMAIL_APP_PASS = os.getenv("FORGET_PASS_EMAIL_APP_PASS")
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
+PRODUCTION = os.getenv("PRODUCTION")
+IS_PRODUCTION: bool = False
+if PRODUCTION == "TRUE":
+    IS_PRODUCTION = True
 
 COOKIE_OPTIONS = {
     "httponly": True,
-    "secure": False,
-    "samesite": "lax",
+    "secure": IS_PRODUCTION,
+    "samesite": "none" if IS_PRODUCTION else "lax",
 }
 
 
