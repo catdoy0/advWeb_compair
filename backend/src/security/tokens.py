@@ -64,7 +64,6 @@ def decode_access_token(token: str) -> dict[str, Any]:
         audience=JWT_AUDIENCE,
         options={"require": ["sub", "type", "role", "iat", "exp", "iss", "aud"]},
     )
-    print(payload)
     if payload.get("type") != "access":
         raise jwt.InvalidTokenError("Expected an access token")
     if not isinstance(payload.get("sub"), str) or not payload["sub"].isdecimal():
