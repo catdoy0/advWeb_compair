@@ -196,16 +196,16 @@ export default function Messages() {
   );
 
   return (
-    <DashboardPage className="mb-6 pb-15">
+    <DashboardPage className="max-h-[calc(100vh-5rem)]">
       <PageHeader
         eyebrow="Customer care / inbox"
         title="Service messages"
         description="Keep repair conversations attached to the request so customers always know what happens next."
       />
 
-      <div className="mt-6 grid min-h-[590px] max-h-[600px] gap-4 lg:grid-cols-[373px_minmax(0,1fr)]">
+      <div className="mt-6 grid h-[calc(100vh-220px)] min-h-[500px] max-h-[700px] gap-4 lg:grid-cols-[373px_minmax(0,1fr)]">
         {/* Inbox */}
-        <DashboardPanel contentClassName="h-full">
+        <DashboardPanel className="flex h-full min-h-[300px] flex-col" contentClassName="flex min-h-0 flex-1 flex-col">
           <div className="border-b border-[#d8e0eb] px-4 py-3 dark:border-slate-700">
             <div className="flex items-center justify-between">
               <div>
@@ -218,9 +218,9 @@ export default function Messages() {
                     : `${conversations.length} conversation${conversations.length === 1 ? "" : "s"}`}
                 </p>
               </div>
-              <span className="rounded bg-[#eef4ff] dark:bg-[#0b213d] px-2 py-0.5 text-xs font-semibold text-[#2870e8] dark:text-[#8ec5ff]">
-                {conversations.length}
-              </span>
+              {/* <span className="rounded bg-[#eef4ff] dark:bg-[#0b213d] px-2 py-0.5 text-xs font-semibold text-[#2870e8] dark:text-[#8ec5ff]"> */}
+              {/*   {conversations.length} */}
+              {/* </span> */}
             </div>
           </div>
 
@@ -240,7 +240,7 @@ export default function Messages() {
             </div>
           </div>
 
-          <div className="overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {filteredConversations.map((conv) => {
               const isSelected = selectedId === conv.id;
               const title = conversationTitle(conv, isCustomer);
@@ -304,9 +304,9 @@ export default function Messages() {
         </DashboardPanel>
 
 
-        <DashboardPanel contentClassName="flex h-full w-full min-w-0 items-center justify-center">
+        <DashboardPanel className="h-full min-h-[500px]" contentClassName="flex h-full min-h-0 w-full min-w-0 items-center justify-center">
           {selectedConversation ? (
-            <div className="flex max-h-[670px] h-full w-full flex-col">
+            <div className="flex h-full min-h-0 w-full flex-col">
               <div className="flex items-center gap-3 border-b border-[#d8e0eb] px-5 py-4 dark:border-slate-700">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#dceaff] text-[10px] font-bold text-[#2870e8]">
                   {initialsOf(conversationTitle(selectedConversation, isCustomer))}
@@ -324,7 +324,7 @@ export default function Messages() {
               <div
                 ref={messagesRef}
                 onScroll={(e) => setAtBottom(isNearBottom(e.currentTarget))}
-                className="flex flex-1 flex-col gap-3 overflow-y-auto p-5"
+                className="min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-5"
               >
                 {messages.length === 0 ? (
                   <p className="m-auto text-[11px] text-slate-400">
@@ -336,7 +336,7 @@ export default function Messages() {
                     return (
                       <div
                         key={msg.id}
-                        className={`flex max-w-[75%] flex-col ${
+                        className={`flex max-w-full flex-col ${
                           isMine ? "self-end items-end" : "self-start items-start"
                         }`}
                       >
@@ -353,7 +353,7 @@ export default function Messages() {
                           {msg.content}
                         </div>
                           <span className={`mt-1 text-[9px] text-slate-400 dark:text-slate-500`}>
-                            {/* {new Date(msg.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} */}
+                            {/* {new Date(msg.created_at).toLocaleTimeString([], { hour: '', minute: '2-digit' })} */}
                             {dayjs(msg.created_at).calendar()}
                           </span>
                       </div>

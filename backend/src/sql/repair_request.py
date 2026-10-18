@@ -129,7 +129,6 @@ def create_conversation_for_repair(
         return conv
 
 
-# ---------- reads ----------
 
 def list_appointments_for_customer(customer_id: int, on_date: date) -> list[dict]:
     with Session(engine) as s:
@@ -183,6 +182,25 @@ def list_appointments_for_team(on_date: date) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def decline_stale_appointments() -> int:
+    """
+    Automatically cancels PENDING appointments where the scheduled_date 
+    was 3 or more days ago. Returns the number of rows updated.
+    """
+    with Session(engine) as s:
+        result = s.execute(
+            text("""
+                UPDATE appointments
+                SET status = 'CANCELLED', updated_at = NOW()
+                WHERE status = 'PENDING'
+                  AND scheduled_date <= CURRENT_DATE - INTERVAL '3 days'
+            """)
+        )
+        s.commit()
+
+        return result.rowcount # type: ignore
+
+
 def count_appointments_by_day(
     customer_id: int | None,
     start: date,
@@ -213,29 +231,43 @@ def count_appointments_by_day(
     return {row[0].isoformat(): row[1] for row in rows}
 
 
-def next_appointment_date(customer_id: int | None) -> date | None:
-    """Earliest scheduled_date >= today. Customer-scoped if customer_id given."""
+def get_next_appointment(customer_id: int | None, offset: int = 0) -> dict:
+    """Return one upcoming appointment and whether another page exists."""
     with Session(engine) as s:
+        base_sql = """
+            SELECT
+                a.id,
+                a.scheduled_date,
+                a.scheduled_time,
+                a.status,
+                rr.id AS repair_request_id,
+                rr.repair_number,
+                rr.requested_service,
+                d.computer_name,
+                d.computer_type
+            FROM appointments a
+            JOIN repair_requests rr ON rr.id = a.repair_request_id
+            JOIN devices d ON d.id = rr.device_id
+            WHERE a.scheduled_date >= CURRENT_DATE
+              AND a.status IN ('PENDING', 'CONFIRMED')
+        """
+        
+        customer_filter = " AND rr.customer_id = :cid" if customer_id is not None else ""
+        sql = text(
+            base_sql
+            + customer_filter
+            + " ORDER BY a.scheduled_date ASC, a.scheduled_time ASC, a.id ASC LIMIT 2 OFFSET :offset"
+        )
+        params = {"offset": max(offset, 0)}
         if customer_id is not None:
-            sql = text("""
-                SELECT MIN(a.scheduled_date) AS d
-                FROM appointments a
-                JOIN repair_requests rr ON rr.id = a.repair_request_id
-                WHERE rr.customer_id = :cid
-                  AND a.scheduled_date >= CURRENT_DATE
-            """)
-            params = {"cid": customer_id}
-        else:
-            sql = text("""
-                SELECT MIN(a.scheduled_date) AS d
-                FROM appointments a
-                WHERE a.scheduled_date >= CURRENT_DATE
-            """)
-            params = {}
+            params["cid"] = customer_id
 
-        row = s.execute(sql, params).first()
+        rows = s.execute(sql, params).mappings().all()
 
-    return row[0] if row and row[0] else None
+    return {
+        "appointment": dict(rows[0]) if rows else None,
+        "has_next": len(rows) > 1,
+    }
 
 
 def count_appointments_for_day(on_date: date) -> int:

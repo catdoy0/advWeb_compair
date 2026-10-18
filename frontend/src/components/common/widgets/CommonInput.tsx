@@ -1,7 +1,7 @@
 import { useState, type InputHTMLAttributes, type ReactNode } from "react"
 import { Eye, EyeOff } from "lucide-react"
 
-type BaseVariant = "default" | "compact"
+type BaseVariant = "default" | "compact" | "dashboard"
 type CommonInputVariant = BaseVariant | "password"
 
 const styles: Record<BaseVariant, { label: string; input: string }> = {
@@ -27,16 +27,21 @@ const styles: Record<BaseVariant, { label: string; input: string }> = {
       dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100
     `,
   },
+  dashboard: {
+    label:
+      "mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400",
+    input: `
+      h-10 w-full rounded-md border border-[#cfd9e8] bg-white
+      text-[12px] text-[#102c50] transition-colors
+      placeholder:text-slate-400 focus:border-[#2870e8]
+      dark:border-slate-600 dark:bg-[#182536] dark:text-white
+    `,
+  },
 }
 
 interface CommonInputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
   icon?: ReactNode
-  /**
-   * 'default'  — rounded-lg, slate chrome (matches the auth forms)
-   * 'compact'  — shorter, subtler, good for toolbars/filters
-   * 'password' — same look as 'default' + eye/eye-off visibility toggle
-   */
   variant?: CommonInputVariant
   /** Error message. When non-empty, the input shows a red border and the message appears below. */
   error?: string
@@ -62,7 +67,7 @@ export default function CommonInput({
   const hasError = Boolean(error)
 
   return (
-    <div>
+    <div className={className}>
       {label && (
         <label htmlFor={props.id} className={labelClass}>
           <span>{label}</span>
@@ -88,11 +93,10 @@ export default function CommonInput({
           aria-invalid={hasError}
           className={`
             w-full outline-none
-            ${icon ? "pl-10" : "pl-4"}
-            ${isPassword ? "pr-11" : "pr-4"}
+            ${icon ? "pl-10" : "px-3"}
+            ${isPassword ? "pr-11" : "pr-3"}
             ${inputClass}
             ${hasError ? "!border-red-500 focus:!border-red-500" : ""}
-            ${className}
           `}
         />
 

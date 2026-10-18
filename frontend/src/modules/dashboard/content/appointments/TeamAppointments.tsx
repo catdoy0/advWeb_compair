@@ -14,7 +14,7 @@ import DashboardPanel from "../../components/DashboardPanel";
 import {
   listAppointments,
   getAppointmentWeekCounts,
-  getNextAppointmentDate,
+  getNextAppointment,
 } from "../../../../api/repair_requests";
 import type { Appointment as ApiAppointment } from "../../../../types/repair_requests";
 
@@ -80,10 +80,10 @@ export default function TeamAppointments() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const iso = await getNextAppointmentDate();
+      const { appointment: nextAppointment } = await getNextAppointment();
       if (cancelled) return;
-      if (iso) {
-        const d = dayjs(iso);
+      if (nextAppointment) {
+        const d = dayjs(nextAppointment.scheduled_date);
         setSelectedDate(d);
         setWeekReference(d);
       }

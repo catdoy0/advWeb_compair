@@ -40,6 +40,11 @@ export interface Appointment {
   customer_name?: string;
 }
 
+export interface NextAppointmentPage {
+  appointment: Appointment | null;
+  has_next: boolean;
+}
+
 export type AppointmentCountsByDay = Record<string, number>;
 
 

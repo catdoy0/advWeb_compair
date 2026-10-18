@@ -21,7 +21,7 @@ import CreateRepairRequestModal from "../../modals/CreateRepairRequestModal";
 import {
   listAppointments,
   getAppointmentWeekCounts,
-  getNextAppointmentDate,
+  getNextAppointment,
 } from "../../../../api/repair_requests";
 import type { Appointment as ApiAppointment } from "../../../../types/repair_requests";
 
@@ -40,7 +40,7 @@ function toStatusEnum(status: string): Status {
 }
 
 function formatTime(t: string): string {
-  // "14:30:00" → "2:30 PM"
+  if (!t) return "—";
   return dayjs(`2000-01-01T${t}`).format("h:mm A");
 }
 
@@ -61,6 +61,11 @@ export default function CustomerAppointments() {
   const [ready, setReady] = useState(false);
 
   const [appointments, setAppointments] = useState<ApiAppointment[]>([]);
+  const [nextAppt, setNextAppt] = useState<ApiAppointment | null>(null);
+  const [nextAppointmentOffset, setNextAppointmentOffset] = useState(0);
+  const [hasNextAppointment, setHasNextAppointment] = useState(false);
+  const [nextAppointmentLoading, setNextAppointmentLoading] = useState(true);
+
   const [countsByDay, setCountsByDay] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
@@ -71,6 +76,7 @@ export default function CustomerAppointments() {
   const [refreshTick, setRefreshTick] = useState(0);
   const { subscribe } = useEvents();
 
+  // Listen for SSE events to auto-refresh
   useEffect(() => {
     return subscribe("new-notification", (data) => {
       const payload = data as { type?: string };
@@ -80,34 +86,35 @@ export default function CustomerAppointments() {
     });
   }, [subscribe]);
 
-  // add refreshTick to the main load effect deps
-  useEffect(() => {
-    // ...existing load effect...
-  }, [ready, selectedDate, weekStart, weekEnd, refreshTick]);
-
-  // on mount: jump to earliest upcoming appointment, if any
+  // Load the current upcoming appointment page and refresh it after a new request.
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      const iso = await getNextAppointmentDate();
+      setNextAppointmentLoading(true);
+      const { appointment: upcoming, has_next } = await getNextAppointment(nextAppointmentOffset);
       if (cancelled) return;
 
-      if (iso) {
-        const d = dayjs(iso);
-        setSelectedDate(d);
-        setWeekReference(d);
+      setNextAppt(upcoming);
+      setHasNextAppointment(has_next);
+      if (upcoming) {
+        const d = dayjs(upcoming.scheduled_date); // <-- Access scheduled_date
+        if (nextAppointmentOffset === 0) {
+          setSelectedDate(d);
+          setWeekReference(d);
+        }
       }
 
-      setReady(true);
+      setNextAppointmentLoading(false);
+      if (nextAppointmentOffset === 0) setReady(true);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [nextAppointmentOffset, refreshTick]);
 
-  // reload appointments + week counts whenever the day or week changes
+  // reload appointments + week counts whenever the day, week, or refreshTick changes
   useEffect(() => {
     if (!ready) return;
 
@@ -131,15 +138,14 @@ export default function CustomerAppointments() {
     return () => {
       cancelled = true;
     };
-  }, [ready, selectedDate, weekStart, weekEnd]);
+  }, [ready, selectedDate, weekStart, weekEnd, refreshTick]); // <-- Added refreshTick here
 
-  async function refresh() {
-    const [dayAppointments, weekCounts] = await Promise.all([
-      listAppointments(selectedDate.format("YYYY-MM-DD")),
-      getAppointmentWeekCounts(weekStart, weekEnd),
-    ]);
-    setAppointments(dayAppointments);
-    setCountsByDay(weekCounts);
+  // Used by the CreateRepairRequestModal to force a refresh after creating
+  function refresh(scheduledDate: string) {
+    const createdDate = dayjs(scheduledDate);
+    setSelectedDate(createdDate);
+    setWeekReference(createdDate);
+    setRefreshTick((t) => t + 1);
   }
 
   const handlePreviousWeek = () => {
@@ -148,6 +154,12 @@ export default function CustomerAppointments() {
 
   const handleNextWeek = () => {
     setWeekReference((w) => w.add(7, "day"));
+  };
+
+  const handleCurrentWeek = () => {
+    const today = dayjs();
+    setWeekReference(today);
+    setSelectedDate(today);
   };
 
   const columns: DataTableColumn<ApiAppointment>[] = [
@@ -175,7 +187,7 @@ export default function CustomerAppointments() {
     },
   ];
 
-  const nextAppointment = appointments[0];
+  // const nextAppointment = appointments[0];
 
   return (
     <DashboardPage>
@@ -220,6 +232,10 @@ export default function CustomerAppointments() {
               <ChevronLeft size={16} />
             </button>
 
+            <CommonButton variant="outline" className="py-1!" onClick={handleCurrentWeek}>
+              Today
+            </CommonButton>
+
             <button
               type="button"
               onClick={handleNextWeek}
@@ -241,7 +257,7 @@ export default function CustomerAppointments() {
                 key={iso}
                 type="button"
                 onClick={() => setSelectedDate(wd.date)}
-                className={`min-h-[96px] rounded-md border p-2 text-left transition-colors ${
+                className={`min-h-24 rounded-md border p-2 text-left transition-colors ${
                   isSelected
                     ? "border-[#a8c8ff] bg-[#eef4ff] dark:border-[#2870e8] dark:bg-[#172a42]"
                     : "border-[#d8e0eb] bg-[#f8fafc] hover:border-[#b9c7d8] hover:bg-white dark:border-slate-700 dark:bg-[#151f2d] dark:hover:bg-[#182536]"
@@ -292,30 +308,61 @@ export default function CustomerAppointments() {
           title="Your next appointment"
           description="Only your computer repair booking details."
         >
-          {nextAppointment ? (
+          {nextAppt && (hasNextAppointment || nextAppointmentOffset > 0) && (
+            <div className="flex items-center justify-end gap-2 px-5 pt-4">
+              <button
+                type="button"
+                aria-label="Previous appointment"
+                disabled={nextAppointmentOffset === 0 || nextAppointmentLoading}
+                onClick={() => setNextAppointmentOffset((offset) => Math.max(0, offset - 1))}
+                className="rounded-md border p-1.5 text-slate-500 disabled:opacity-40"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <span className="text-[10px] text-slate-400">{nextAppointmentOffset + 1}</span>
+              <button
+                type="button"
+                aria-label="Next appointment"
+                disabled={!hasNextAppointment || nextAppointmentLoading}
+                onClick={() => setNextAppointmentOffset((offset) => offset + 1)}
+                className="rounded-md border p-1.5 text-slate-500 disabled:opacity-40"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          )}
+          {nextAppointmentLoading ? (
+            <p className="px-5 py-8 text-center text-[11px] text-slate-400">Loading...</p>
+          ) : nextAppt ? (
             <div className="grid grid-cols-2 gap-x-6 gap-y-5 p-5">
+              <div>
+                <p className="text-[10px] text-slate-400">Date</p>
+                <p className="mt-1 text-[12px] font-bold text-[#102c50] dark:text-white">
+                  {dayjs(nextAppt.scheduled_date).format("MMM D, YYYY")}
+                </p>
+              </div>
               <div>
                 <p className="text-[10px] text-slate-400">Time</p>
                 <p className="mt-1 text-[12px] font-bold text-[#102c50] dark:text-white">
-                  {formatTime(nextAppointment.scheduled_time)}
+                  {formatTime(nextAppt.scheduled_time)}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] text-slate-400">Status</p>
                 <p className="mt-1 text-[12px] font-bold text-[#102c50] dark:text-white">
-                  {toStatusEnum(nextAppointment.status)}
+                  {toStatusEnum(nextAppt.status)}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] text-slate-400">Computer</p>
                 <p className="mt-1 text-[12px] font-bold text-[#102c50] dark:text-white">
-                  {nextAppointment.computer_name}
+                  {nextAppt.computer_name}
                 </p>
               </div>
-              <div>
+              <div className="col-span-2">
                 <p className="text-[10px] text-slate-400">Service</p>
                 <p className="mt-1 text-[12px] font-bold text-[#102c50] dark:text-white">
-                  {nextAppointment.requested_service}
+                  {nextAppt.requested_service}
                 </p>
               </div>
             </div>

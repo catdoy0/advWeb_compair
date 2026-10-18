@@ -16,6 +16,10 @@ def list_appointments(
 ):
     user = _require_user(request)
 
+    affected_declined = rr_sql.decline_stale_appointments()
+    if affected_declined > 0:
+        print(f"auto declined appointments: {affected_declined}")
+
     if user.role == UserRole.CUSTOMER:
         rows = rr_sql.list_appointments_for_customer(user.id, on_date) # type: ignore
     else:
@@ -60,7 +64,7 @@ def appointments_week(
     return rr_sql.count_appointments_by_day(customer_id, start, end)
 
 @router.get("/next")
-def next_appointment(request: Request):
+def next_appointment(request: Request, offset: int = Query(default=0, ge=0)):
     user = _require_user(request)
     customer_id = user.id if user.role == UserRole.CUSTOMER else None
-    return {"date": rr_sql.next_appointment_date(customer_id)}
+    return rr_sql.get_next_appointment(customer_id, offset)

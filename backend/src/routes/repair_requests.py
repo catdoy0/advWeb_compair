@@ -30,7 +30,7 @@ def _validate_preferred_datetime(body: CreateRepairRequestRequest):
         raise HTTPException(status_code=400, detail="Preferred date and time must be in the future")
 
     if (body.preferred_date - date.today()).days > 31:
-        raise HTTPException(status_code=400, detail="Preferred date must be within 31 days")
+        raise HTTPException(status_code=400, detail="Preferred date must be within 14 days")
 
     if not (8 <= body.preferred_time.hour < 19):
         raise HTTPException(status_code=400, detail="Preferred time must be between 8:00 and 19:00")

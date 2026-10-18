@@ -10,6 +10,7 @@ import type {
   RepairPartUsage,
   RepairQueueResponse,
   RepairRequestCreated,
+  NextAppointmentPage,
   WorkspaceResponse,
 } from "../types/repair_requests";
 
@@ -49,11 +50,10 @@ export async function getAppointmentWeekCounts(
 }
 
 
-export async function getNextAppointmentDate(): Promise<string | null> {
-  const res = await apiFetch("appointments/next", { method: "GET" });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.date;
+export async function getNextAppointment(offset = 0): Promise<NextAppointmentPage> {
+  const res = await apiFetch(`appointments/next?offset=${offset}`, { method: "GET" });
+  if (!res.ok) return { appointment: null, has_next: false };
+  return await res.json();
 }
 
 
