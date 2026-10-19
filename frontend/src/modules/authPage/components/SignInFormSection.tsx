@@ -2,7 +2,7 @@ import { ArrowRight } from "lucide-react"
 import { Link, useNavigate } from "react-router";
 
 import CommonButton from "../../../components/common/widgets/CommonButton"
-import GoogleLogo from "../../../components/common/widgets/GoogleLogo"
+import GoogleSignInButton from "../../../components/common/widgets/GoogleSignInButton"
 import DarkModeButton from "../../../components/common/widgets/DarkModeButton"
 import BackButton from "../../../components/common/widgets/BackButton";
 import CommonInput from "../../../components/common/widgets/CommonInput";
@@ -18,7 +18,7 @@ export default function SignInFormSection() {
   const [submitting, setSubmitting] = useState(false);
 
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
 
   async function handleSubmit(e: React.SubmitEvent) {
     e.preventDefault();
@@ -37,6 +37,23 @@ export default function SignInFormSection() {
       navigate(ROUTES.DASHBOARD.ROOT);
     } catch {
       setError("Unable to sign in. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleCredential(credential: string) {
+    setError("");
+    setSubmitting(true);
+    try {
+      const result = await loginWithGoogle(credential);
+      if (!result.ok) {
+        setError(result.message ?? "Google sign-in failed.");
+        return;
+      }
+      navigate(ROUTES.DASHBOARD.ROOT);
+    } catch {
+      setError("Unable to sign in with Google. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -123,13 +140,10 @@ export default function SignInFormSection() {
           <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
         </div>
 
-        <CommonButton
-          type="button"
-          variant="outline"
-          className="flex w-full items-center justify-center gap-2"
-        >
-          <GoogleLogo size={16} /> Sign in with Google
-        </CommonButton>
+        <GoogleSignInButton
+          onCredential={handleGoogleCredential}
+          onError={setError}
+        />
 
         <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
           Don't have an account?{" "}

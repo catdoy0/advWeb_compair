@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   session as apiSession,
   login as apiLogin,
+  googleSignIn as apiGoogleSignIn,
   signUp as apiSignUp,
   logout as apiLogout,
 } from "../api/auth";
@@ -13,6 +14,7 @@ interface AuthContextType {
   session: UserSession | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<boolean>;
+  loginWithGoogle: (credential: string) => Promise<{ ok: boolean; message?: string }>;
   signUp: (payload: SignUpPayload) => Promise<boolean>;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
@@ -37,6 +39,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data) return false;
     setSession(data);
     return true;
+  }
+
+  async function loginWithGoogle(credential: string) {
+    const result = await apiGoogleSignIn(credential);
+    if (!result.session) return { ok: false, message: result.error };
+    setSession(result.session);
+    return { ok: true };
   }
 
   async function signUp(payload: SignUpPayload) {
@@ -67,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, loading, login, signUp, refresh, logout }}>
+    <AuthContext.Provider value={{ session, loading, login, loginWithGoogle, signUp, refresh, logout }}>
       {children}
     </AuthContext.Provider>
   );

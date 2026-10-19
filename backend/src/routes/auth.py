@@ -1,6 +1,9 @@
 import secrets
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
+from google.auth.exceptions import GoogleAuthError
+from google.auth.transport.requests import Request as GoogleRequest
+from google.oauth2 import id_token
 from jwt import PyJWTError
 
 from src.config import (
@@ -8,10 +11,12 @@ from src.config import (
     COOKIE_OPTIONS,
     FORGET_PASS_EMAIL,
     FORGET_PASS_EMAIL_APP_PASS,
+    GOOGLE_CLIENT_ID,
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
 from src.schemas.auth import (
     CheckEmailRequest,
+    GoogleSignInRequest,
     LoginRequest,
     PasswordResetCodeRequest,
     PasswordResetRequest,
@@ -29,6 +34,7 @@ from src.services.auth import (
     revoke_refresh_token,
     serialize_user,
     signin_user,
+    signin_google_user,
     signup_user,
 )
 from src.services.store_settings import read_settings, serialize_store_settings
@@ -165,6 +171,33 @@ def signin(data: LoginRequest, response: Response):
     return {
         "user": serialize_user(user),
         "store_settings": serialize_store_settings(store_settings)
+    }
+
+
+@router.post("/google")
+def google_signin(data: GoogleSignInRequest, response: Response):
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured")
+
+    try:
+        claims = id_token.verify_oauth2_token(
+            data.credential,
+            GoogleRequest(),
+            GOOGLE_CLIENT_ID,
+        )
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid Google credential")
+    except GoogleAuthError:
+        raise HTTPException(status_code=503, detail="Could not verify Google credential")
+
+    if claims.get("email_verified") is not True:
+        raise HTTPException(status_code=401, detail="Google email is not verified")
+
+    user, access_token, refresh_token = signin_google_user(claims)
+    _set_auth_cookies(response, access_token, refresh_token)
+    return {
+        "user": serialize_user(user),
+        "store_settings": serialize_store_settings(read_settings()),
     }
 
 

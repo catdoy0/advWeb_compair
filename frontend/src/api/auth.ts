@@ -26,6 +26,26 @@ export async function requestPasswordReset(email: string): Promise<{ ok: boolean
   }
 }
 
+export async function googleSignIn(credential: string): Promise<{
+  session: UserSession | null;
+  error: string;
+}> {
+  try {
+    const res = await fetch(`${API_URL}/auth/google`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ credential }),
+    });
+    if (!res.ok) {
+      return { session: null, error: await readError(res, "Google sign-in failed.") };
+    }
+    return { session: await res.json(), error: "" };
+  } catch {
+    return { session: null, error: "Unable to contact the server. Please try again." };
+  }
+}
+
 export async function verifyPasswordResetCode(payload: {
   email: string;
   code: string;

@@ -27,6 +27,23 @@ def get_user_by_id(user_id: int) -> Users | None:
         ).first()
 
 
+def get_user_by_oauth(provider: str, provider_user_id: str) -> Users | None:
+    with Session(engine) as s:
+        return s.exec(
+            select(Users).where(
+                Users.oauth_provider == provider,
+                Users.oauth_id == provider_user_id,
+            )
+        ).first()
+
+
+def get_user_record_by_email(email: str) -> Users | None:
+    with Session(engine) as s:
+        return s.exec(
+            select(Users).where(func.lower(Users.email) == email.strip().lower())
+        ).first()
+
+
 def email_exists(email: str) -> bool:
     with Session(engine) as s:
         return s.exec(
@@ -36,6 +53,21 @@ def email_exists(email: str) -> bool:
 
 def add_user(user: Users) -> Users:
     with Session(engine) as s:
+        s.add(user)
+        s.commit()
+        s.refresh(user)
+        return user
+
+
+def link_google_identity(user_id: int, google_id: str, avatar_url: str | None) -> Users | None:
+    with Session(engine) as s:
+        user = s.get(Users, user_id)
+        if user is None or user.oauth_provider is not None or user.oauth_id is not None:
+            return None
+        user.oauth_provider = "google"
+        user.oauth_id = google_id
+        if avatar_url:
+            user.avatar_url = avatar_url[:500]
         s.add(user)
         s.commit()
         s.refresh(user)

@@ -41,3 +41,7 @@ class PasswordResetRequest(BaseModel):
     reset_token: str
     password: str = Field(min_length=8, max_length=128)
     confirm_password: str = Field(min_length=8, max_length=128)
+
+
+class GoogleSignInRequest(BaseModel):
+    credential: str = Field(min_length=100)
