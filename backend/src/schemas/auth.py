@@ -1,5 +1,5 @@
 from email_validator import EmailNotValidError, validate_email
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class LoginRequest(BaseModel):
@@ -26,3 +26,18 @@ class SignUpRequest(BaseModel):
 
 class CheckEmailRequest(BaseModel):
     email: EmailStr
+
+
+class PasswordResetSendCodeRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetCodeRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class PasswordResetRequest(BaseModel):
+    reset_token: str
+    password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)

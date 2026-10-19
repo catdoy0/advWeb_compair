@@ -1,13 +1,29 @@
-from fastapi import APIRouter, HTTPException, Request, Response
+import secrets
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 from jwt import PyJWTError
 
 from src.config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     COOKIE_OPTIONS,
+    FORGET_PASS_EMAIL,
+    FORGET_PASS_EMAIL_APP_PASS,
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
-from src.schemas.auth import CheckEmailRequest, LoginRequest, SignUpRequest
-from src.security.tokens import decode_access_token
+from src.schemas.auth import (
+    CheckEmailRequest,
+    LoginRequest,
+    PasswordResetCodeRequest,
+    PasswordResetRequest,
+    PasswordResetSendCodeRequest,
+    SignUpRequest,
+)
+from src.security.auth import send_reset_pass
+from src.security.tokens import (
+    create_password_reset_token,
+    decode_access_token,
+    decode_password_reset_token,
+)
 from src.services.auth import (
     refresh_session,
     revoke_refresh_token,
@@ -15,9 +31,13 @@ from src.services.auth import (
     signin_user,
     signup_user,
 )
+from src.services.store_settings import read_settings, serialize_store_settings
 from src.sql import auth as auth_sql
+from src.sql import password_reset as password_reset_sql
 
 router = APIRouter()
+
+
 
 
 ACCESS_MAX_AGE = ACCESS_TOKEN_EXPIRE_MINUTES * 60
@@ -43,18 +63,109 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
     _set_refresh_cookie(response, refresh_token)
 
 
+@router.get("/store-settings")
+def get_store_settings():
+    return serialize_store_settings(read_settings())
+
+
+@router.post("/forget-password-sendcode")
+def forget_password_sendcode(
+    data: PasswordResetSendCodeRequest,
+    background_tasks: BackgroundTasks,
+    response: Response,
+):
+    if not FORGET_PASS_EMAIL or not FORGET_PASS_EMAIL_APP_PASS:
+        raise HTTPException(status_code=503, detail="Password reset email is not configured")
+
+    email = str(data.email).strip().lower()
+    user = auth_sql.get_user_by_email(email)
+    if user is None or user.id is None:
+        raise HTTPException(status_code=404, detail="No account found for this email")
+
+    token = secrets.token_urlsafe(32)
+    code = f"{secrets.randbelow(900_000) + 100_000:06d}"
+    response.set_cookie(
+        key="reset_pass",
+        value=token,
+        max_age=60 * 60,
+        path="/",
+        **COOKIE_OPTIONS,
+    )
+
+    password_reset_sql.create_reset_request(user.id, token, code)
+    background_tasks.add_task(send_reset_pass, email, code)
+
+    return {"message": "Reset code sent."}
+
+
+@router.post("/reset-password")
+def reset_password(data: PasswordResetRequest, response: Response):
+    if data.password != data.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
+    try:
+        claims = decode_password_reset_token(data.reset_token)
+        user_id = int(claims["sub"])
+    except (PyJWTError, KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if not password_reset_sql.reset_user_password(
+        user_id, claims["email"], data.reset_token, data.password
+    ):
+        raise HTTPException(status_code=400, detail="Invalid or expired reset code")
+
+    user, access_token, refresh_token = signin_user(
+        LoginRequest(email=claims["email"], password=data.password)
+    )
+    _set_auth_cookies(response, access_token, refresh_token)
+    return {
+        "message": "Password reset successfully",
+        "user": serialize_user(user),
+        "store_settings": serialize_store_settings(read_settings()),
+    }
+
+
+@router.post("/verify-reset-code")
+def verify_reset_code(data: PasswordResetCodeRequest, request: Request, response: Response):
+    cookie_token = request.cookies.get("reset_pass")
+    if not cookie_token:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset code")
+
+    email = str(data.email).strip().lower()
+    user = password_reset_sql.get_reset_user(email, cookie_token)
+    if user is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset code")
+
+    reset_jwt, expires_at = create_password_reset_token(user)
+    if not password_reset_sql.verify_reset_code_and_store_jwt(
+        email, cookie_token, data.code, reset_jwt, expires_at
+    ):
+        raise HTTPException(status_code=400, detail="Invalid or expired reset code")
+
+    response.delete_cookie("reset_pass", path="/")
+    return {"reset_token": reset_jwt, "expires_in": 300}
+
+
 @router.post("/signup")
 def signup(data: SignUpRequest, response: Response):
     user, access_token, refresh_token = signup_user(data)
     _set_auth_cookies(response, access_token, refresh_token)
-    return {"user": serialize_user(user)}
+    store_settings = read_settings()
+    return {
+        "user": serialize_user(user),
+        "store_settings": serialize_store_settings(store_settings)
+    }
 
 
 @router.post("/signin")
 def signin(data: LoginRequest, response: Response):
     user, access_token, refresh_token = signin_user(data)
     _set_auth_cookies(response, access_token, refresh_token)
-    return {"user": serialize_user(user)}
+    store_settings = read_settings()
+    return {
+        "user": serialize_user(user),
+        "store_settings": serialize_store_settings(store_settings)
+    }
 
 
 @router.post("/session")
@@ -67,8 +178,15 @@ def check_session(response: Response, request: Request):
             user_id = int(claims["sub"])
             user = auth_sql.get_user_by_id(user_id)
 
+            store_settings = read_settings()
             if user is not None and user.role.value == claims["role"]:
-                return {"user": serialize_user(user)}
+                return {
+                    "user": serialize_user(user),
+                    "store_settings": serialize_store_settings(store_settings)
+                        }
+            else: return {
+                    "store_settings": serialize_store_settings(store_settings)
+                        }
         except (PyJWTError, KeyError, TypeError, ValueError):
             pass
 
@@ -79,7 +197,10 @@ def check_session(response: Response, request: Request):
     user, new_access = refresh_session(refresh_token)
     _set_access_cookie(response, new_access)
     _set_refresh_cookie(response, refresh_token)
-    return {"user": serialize_user(user)}
+    return {
+        "user": serialize_user(user),
+        "store_settings": serialize_store_settings(read_settings()),
+    }
 
 
 @router.post("/logout")

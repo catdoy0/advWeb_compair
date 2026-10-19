@@ -15,6 +15,11 @@ export interface UserSession {
   };
 }
 
+export interface StoreSettings {
+  email: string;
+  number: string;
+}
+
 
 export interface SignUpPayload {
   firstName: string;

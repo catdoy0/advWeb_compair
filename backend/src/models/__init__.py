@@ -13,6 +13,7 @@ from src.models.enums import (
 )
 from src.models.messages import Messages
 from src.models.notifications import Notifications
+from src.models.password_reset import Password_Reset
 from src.models.parts import Parts
 from src.models.payments import Payments
 from src.models.refresh_sessions import Refresh_Session
@@ -33,6 +34,7 @@ __all__ = [
     "NotificationType",
     "Notifications",
     "Parts",
+    "Password_Reset",
     "PaymentMethod",
     "PaymentStatus",
     "Payments",

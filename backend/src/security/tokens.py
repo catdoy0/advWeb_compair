@@ -16,6 +16,7 @@ from src.models.users import Users
 JWT_ISSUER = "adv-web-backend"
 JWT_AUDIENCE = "adv-web-frontend"
 REFRESH_TOKEN_BYTES = 96
+PASSWORD_RESET_TOKEN_TTL = timedelta(minutes=5)
 
 
 def _jwt_secret() -> str:
@@ -68,6 +69,51 @@ def decode_access_token(token: str) -> dict[str, Any]:
         raise jwt.InvalidTokenError("Expected an access token")
     if not isinstance(payload.get("sub"), str) or not payload["sub"].isdecimal():
         raise jwt.InvalidTokenError("Invalid token subject")
+    return payload
+
+
+def create_password_reset_token(user: Users) -> tuple[str, datetime]:
+    """Create a short-lived JWT scoped to resetting this user's password."""
+    if user.id is None:
+        raise ValueError("Cannot issue a reset token for a user without an ID")
+
+    now = datetime.now(timezone.utc)
+    expires_at = now + PASSWORD_RESET_TOKEN_TTL
+    payload = {
+        "sub": str(user.id),
+        "email": user.email.strip().lower(),
+        "type": "password_reset",
+        "iss": JWT_ISSUER,
+        "aud": "adv-web-password-reset",
+        "iat": now,
+        "exp": expires_at,
+    }
+    token = jwt.encode(
+        payload,
+        _jwt_secret(),
+        algorithm=JWT_ALGORITHM,
+        headers={"typ": "pr+jwt"},
+    )
+    return token, expires_at
+
+
+def decode_password_reset_token(token: str) -> dict[str, Any]:
+    if jwt.get_unverified_header(token).get("typ") != "pr+jwt":
+        raise jwt.InvalidTokenError("Unexpected token type")
+    payload = jwt.decode(
+        token,
+        _jwt_secret(),
+        algorithms=[JWT_ALGORITHM],
+        issuer=JWT_ISSUER,
+        audience="adv-web-password-reset",
+        options={"require": ["sub", "email", "type", "iat", "exp", "iss", "aud"]},
+    )
+    if payload.get("type") != "password_reset":
+        raise jwt.InvalidTokenError("Expected a password reset token")
+    if not isinstance(payload.get("sub"), str) or not payload["sub"].isdecimal():
+        raise jwt.InvalidTokenError("Invalid token subject")
+    if not isinstance(payload.get("email"), str):
+        raise jwt.InvalidTokenError("Invalid token email")
     return payload
 
 

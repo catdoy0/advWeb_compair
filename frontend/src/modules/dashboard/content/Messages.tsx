@@ -236,7 +236,7 @@ export default function Messages() {
 
       <div className="mt-6 grid h-[calc(100vh-220px)] min-h-[500px] max-h-[700px] gap-4 lg:grid-cols-[373px_minmax(0,1fr)]">
         {/* Inbox */}
-        <DashboardPanel className="flex h-full min-h-[300px] flex-col" contentClassName="flex min-h-0 flex-1 flex-col">
+        <DashboardPanel className="flex h-full min-h-[500px] flex-col" contentClassName="flex min-h-0 flex-1 flex-col">
           <div className="border-b border-[#d8e0eb] px-4 py-3 dark:border-slate-700">
             <div className="flex items-center justify-between">
               <div>

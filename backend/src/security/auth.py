@@ -1,9 +1,14 @@
+import smtplib
+from email.mime.text import MIMEText
+
 from fastapi import HTTPException, Request, Response
 from jwt import PyJWTError
 
 from src.config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     COOKIE_OPTIONS,
+    FORGET_PASS_EMAIL,
+    FORGET_PASS_EMAIL_APP_PASS,
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
 from src.models.users import UserRole
@@ -63,5 +68,36 @@ def check_user_role(
         **COOKIE_OPTIONS
     )
 
-
     return user.role in allowed_roles
+
+def send_reset_pass(email: str, code: str) -> str:
+    msg = MIMEText(
+        f"""
+    <html>
+    <body>
+        <p>Hello,</p>
+        <p>We received a request to reset your password.</p>
+        <p>Here is your verification code:</p>
+        <br>
+        <h1>{code}</h1>
+        <br>
+        <p>If you didn’t request this, please ignore this email.</p>
+        <br>
+        <p>------------------</p>
+        <p>This message was sent as part of a school project for educational purposes.</p>
+        <p><a href="https://com-pair.web.app">https://com-pair.web.app</a></p>
+    </body>
+    </html>
+    """,
+        "html"
+    )
+    msg["Subject"] = "Password Reset"
+    msg["From"] = FORGET_PASS_EMAIL # type: ignore
+    msg["To"] = email
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(FORGET_PASS_EMAIL, FORGET_PASS_EMAIL_APP_PASS) # type: ignore
+        server.send_message(msg)
+
+    return code

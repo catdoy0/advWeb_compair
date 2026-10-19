@@ -1,5 +1,79 @@
 import { API_URL } from "./config";
-import type { UserSession, SignUpPayload } from "../types/auth";
+import type { StoreSettings, UserSession, SignUpPayload } from "../types/auth";
+
+async function readError(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    return data.detail ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function requestPasswordReset(email: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch(`${API_URL}/auth/forget-password-sendcode`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) return { ok: false, message: await readError(res, "Unable to send reset code.") };
+    const data = await res.json();
+    return { ok: true, message: data.message };
+  } catch {
+    return { ok: false, message: "Unable to send reset code. Please try again." };
+  }
+}
+
+export async function verifyPasswordResetCode(payload: {
+  email: string;
+  code: string;
+}): Promise<{ ok: boolean; message: string; resetToken?: string }> {
+  try {
+    const res = await fetch(`${API_URL}/auth/verify-reset-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return { ok: false, message: await readError(res, "Unable to reset password.") };
+    const data = await res.json();
+    return { ok: true, message: "Code verified.", resetToken: data.reset_token };
+  } catch {
+    return { ok: false, message: "Unable to verify code. Please try again." };
+  }
+}
+
+export async function resetPassword(payload: {
+  reset_token: string;
+  password: string;
+  confirm_password: string;
+}): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch(`${API_URL}/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return { ok: false, message: await readError(res, "Unable to reset password.") };
+    const data = await res.json();
+    return { ok: true, message: data.message };
+  } catch {
+    return { ok: false, message: "Unable to reset password. Please try again." };
+  }
+}
+
+export async function getStoreSettings(): Promise<StoreSettings | null> {
+  try {
+    const res = await fetch(`${API_URL}/auth/store-settings`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
 
 
 export async function login(email: string, password: string): Promise<UserSession | null>{

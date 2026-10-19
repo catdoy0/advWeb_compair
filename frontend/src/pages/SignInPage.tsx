@@ -4,6 +4,8 @@ import SignUpFormSection from "../modules/authPage/components/SignUpFormSection"
 import { useSearchParams } from "react-router";
 import QueryParamRedirect from "../components/common/QueryParamRedirect";
 import { useTitle } from "../hooks/useTitle";
+import ForgetPassword from "../modules/authPage/components/ForgetPassword";
+import EnterResetCode from "../modules/authPage/components/EnterResetCode";
 
 export default function SignInPage() {
   const [searchParams] = useSearchParams();
@@ -18,6 +20,8 @@ export default function SignInPage() {
 
         {authType === "signin" && <SignInFormSection />}
         {authType === "signup" && <SignUpFormSection />}
+        {authType === "forget-password" && <ForgetPassword />}
+        {authType === "enter-reset" && <EnterResetCode />}
 
       </main>
     </QueryParamRedirect>

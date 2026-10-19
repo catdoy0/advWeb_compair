@@ -86,12 +86,12 @@ export default function SignInFormSection() {
             <span className="text-slate-500 dark:text-slate-400">
               Need help signing in?
             </span>
-            <a
-              href="#"
+            <Link
+              to="?type=forget-password"
               className="font-semibold text-[#2d65c8] hover:underline dark:text-blue-400"
             >
               Forgot password
-            </a>
+            </Link>
           </div>
 
           <CommonButton

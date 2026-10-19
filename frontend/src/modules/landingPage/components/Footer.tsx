@@ -2,9 +2,12 @@ import {
   MessageSquare,
   Phone,
 } from "lucide-react"
+import { useEffect, useState } from "react"
 
 import Logo from "../../../components/common/widgets/Logo"
 import SectionContainer from "../SectionContainer"
+import { getStoreSettings } from "../../../api/auth"
+import type { StoreSettings } from "../../../types/auth"
 
 const serviceLinks = [
   "Repair requests",
@@ -53,6 +56,12 @@ function FooterLinks({
 }
 
 export default function Footer() {
+  const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null)
+
+  useEffect(() => {
+    getStoreSettings().then(setStoreSettings)
+  }, [])
+
   return (
     <footer className="bg-white transition-colors duration-300 dark:bg-slate-950">
       <SectionContainer>
@@ -84,12 +93,12 @@ export default function Footer() {
             <div className="mt-3 space-y-2 text-3xs text-[#718198] dark:text-slate-400">
               <p className="flex items-center gap-2">
                 <Phone size={10} />
-                Compair HQ, Caloocan City
+                {storeSettings?.number}
               </p>
 
               <p className="flex items-center gap-2">
                 <MessageSquare size={10} />
-                hello@compair.local
+                {storeSettings?.email}
               </p>
             </div>
           </div>
