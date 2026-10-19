@@ -125,11 +125,6 @@ export default function Messages() {
       setUnreadTotal(page.unread_total);
     } catch (error) {
       console.error("Failed to load conversations", error);
-      if (generation === conversationGenerationRef.current && !append) {
-        setConversations([]);
-        setConversationCount(0);
-        setUnreadTotal(0);
-      }
     } finally {
       if (generation === conversationGenerationRef.current) {
         conversationLoadingRef.current = false;
@@ -153,8 +148,6 @@ export default function Messages() {
       
       // Yield to the event loop before setting state
       await Promise.resolve(); 
-      setConversations([]);
-      
       await loadConversations(debouncedSearch, false, generation);
     })();
   }, [debouncedSearch, conversationRefreshTick, loadConversations]);
@@ -194,7 +187,10 @@ export default function Messages() {
   }, [selectedId]);
 
   const handlePoke = useCallback(
-    async (conversationId: number) => {
+    async (conversationId: number, senderId: number) => {
+      // The sending client already appends its message and updates the preview locally.
+      if (senderId === viewerId) return;
+
       setConversationRefreshTick((tick) => tick + 1);
 
       if (conversationId !== selectedId) return;
@@ -204,7 +200,7 @@ export default function Messages() {
       await markConversationRead(conversationId);
       window.dispatchEvent(new Event("conversations-read"));
     },
-    [selectedId],
+    [selectedId, viewerId],
   );
 
   useMessageEvents(handlePoke);
@@ -221,8 +217,11 @@ export default function Messages() {
 
       setMessages((prev) => [...prev, msg]);
       setDraft("");
-
-      setConversationRefreshTick((tick) => tick + 1);
+      setConversations((current) => current
+        .map((conversation) => conversation.id === selectedId
+          ? { ...conversation, preview: content, last_message_at: msg.created_at }
+          : conversation)
+        .sort((a, b) => Date.parse(b.last_message_at) - Date.parse(a.last_message_at)));
     } finally {
       setSending(false);
     }
