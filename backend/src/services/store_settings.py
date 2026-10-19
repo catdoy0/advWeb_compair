@@ -10,20 +10,21 @@ FILE_PATH = Path(__file__).resolve().parents[2] / "store_settings.json"
 def read_settings() -> StoreSettings:
     """Reads the JSON file and returns a StoreSettings object."""
     if not FILE_PATH.exists():
-        return StoreSettings(email="", number="")
-        
+        # Keep the public settings endpoint usable before the file is provisioned.
+        return StoreSettings.model_construct(email="", number="")
+
     with FILE_PATH.open("r", encoding="utf-8") as f:
         data = json.load(f)
         return StoreSettings(**data)
 
-def write_settings(email: str, number: str) -> None:
-    """Updates the JSON file with new values."""
-    data = {
-        "email": email,
-        "number": number
-    }
-    with FILE_PATH.open("w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+
+def write_settings(settings: StoreSettings) -> None:
+    """Atomically update the store settings JSON file."""
+    temporary_path = FILE_PATH.with_suffix(".json.tmp")
+    with temporary_path.open("w", encoding="utf-8") as f:
+        json.dump(settings.model_dump(mode="json"), f, indent=2)
+        f.write("\n")
+    temporary_path.replace(FILE_PATH)
 
 def serialize_store_settings(store_settings: StoreSettings) -> dict:
     return {

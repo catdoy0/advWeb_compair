@@ -6,6 +6,7 @@ from src.models.enums import ComputerType
 
 
 class CreateRepairRequestRequest(BaseModel):
+    customer_id: int | None = None
     # device fields — find-or-create by computer_name under the customer
     computer_name: str = Field(min_length=1, max_length=150)
     computer_type: ComputerType

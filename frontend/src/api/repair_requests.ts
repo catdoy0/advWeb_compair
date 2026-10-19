@@ -12,6 +12,7 @@ import type {
   RepairRequestCreated,
   NextAppointmentPage,
   WorkspaceResponse,
+  TeamDevice,
 } from "../types/repair_requests";
 
 export async function createRepairRequest(
@@ -222,6 +223,13 @@ export async function updateEstimate(
 
 export async function listMyDevices(): Promise<CustomerDevice[]> {
   const res = await apiFetch("repair-requests/my-devices", { method: "GET" });
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+
+export async function listTeamDevices(): Promise<TeamDevice[]> {
+  const res = await apiFetch("repair-requests/devices", { method: "GET" });
   if (!res.ok) return [];
   return await res.json();
 }

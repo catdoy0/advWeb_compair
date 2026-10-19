@@ -7,6 +7,7 @@ export type AppointmentStatus =
   | "COMPLETED";
 
 export interface CreateRepairRequestPayload {
+  customer_id?: number;
   computer_name: string;
   computer_type: ComputerType;
   serial_number?: string | null;
@@ -142,6 +143,12 @@ export interface CustomerDevice {
   repair_number: string | null;
   repair_status: RepairQueueStatus | null;
   estimate_amount: number | null;
+}
+
+export interface TeamDevice extends CustomerDevice {
+  customer_id: number;
+  customer_name: string;
+  customer_email: string;
 }
 
 

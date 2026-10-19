@@ -1,14 +1,52 @@
-import type { GetUser, TotalUsers } from "../types/administration";
+import type {
+  AdminOverviewData,
+  CustomerDirectoryResponse,
+  GetUser,
+  TotalUsers,
+} from "../types/administration";
 import { API_URL } from "./config";
+import { apiFetch } from "./auth";
 
 const ADMINISTRATION = "administration"
 
+export async function getAdminOverview(onDate: string): Promise<AdminOverviewData | null> {
+  try {
+    const res = await apiFetch(`${ADMINISTRATION}/overview?on_date=${encodeURIComponent(onDate)}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function getCustomers(
+  page: number,
+  pageSize: number,
+  search: string,
+): Promise<CustomerDirectoryResponse | null> {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+    search,
+  });
+  try {
+    const res = await apiFetch(`${ADMINISTRATION}/customers?${params}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 
 export async function getUsers(howMany: number = 10, page: number = 1, search: string = "", role: string = ""): Promise<GetUser[] | null>{
-  const res = await fetch(`${API_URL}/${ADMINISTRATION}/get-users?how_many=${howMany}&page=${page}&search=${search}&role=${role}`, {
-    method: "GET",
-    credentials: "include",
+  const params = new URLSearchParams({
+    how_many: String(howMany),
+    page: String(page),
+    search,
+    role,
   });
+  const res = await apiFetch(`${ADMINISTRATION}/get-users?${params}`);
   if (!res.ok) return null;
   return await res.json();
 }

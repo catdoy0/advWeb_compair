@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from src.models.users import UserRole
@@ -39,6 +41,47 @@ def get_total_users(request: Request, response: Response):
         )
 
     return admin_sql.get_total_users()
+
+
+@router.get("/overview")
+def get_admin_overview(
+    request: Request,
+    response: Response,
+    on_date: str | None = Query(None),
+):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to access this resource",
+        )
+
+    try:
+        overview_date = date.fromisoformat(on_date) if on_date else date.today()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Date must use YYYY-MM-DD format") from exc
+
+    user_id = get_current_user_id(request)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    return admin_sql.get_admin_overview(overview_date, user_id)
+
+
+@router.get("/customers")
+def get_customers(
+    request: Request,
+    response: Response,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=30),
+    search: str = Query("", max_length=200),
+):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to access this resource",
+        )
+
+    return admin_sql.get_customers(page, page_size, search)
 
 
 @router.post("/set-user-active")

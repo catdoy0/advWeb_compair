@@ -641,6 +641,60 @@ def list_devices_for_customer(customer_id: int) -> list[dict]:
     return result
 
 
+def list_devices_for_team() -> list[dict]:
+    """Every customer device, with its owner and latest repair request."""
+    with Session(engine) as s:
+        rows = s.execute(text("""
+            SELECT
+                d.id,
+                d.customer_id,
+                u.first_name,
+                u.last_name,
+                u.email,
+                d.computer_name,
+                d.computer_type,
+                d.serial_number,
+                d.created_at,
+                rr.id AS repair_request_id,
+                rr.repair_number,
+                rr.status AS repair_status,
+                r.estimate_amount
+            FROM devices d
+            JOIN users u ON u.id = d.customer_id
+            LEFT JOIN LATERAL (
+                SELECT *
+                FROM repair_requests
+                WHERE device_id = d.id
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+            ) rr ON TRUE
+            LEFT JOIN repairs r ON r.repair_request_id = rr.id
+            ORDER BY d.created_at DESC, d.id DESC
+        """)).mappings().all()
+
+    return [
+        {
+            "id": row["id"],
+            "customer_id": row["customer_id"],
+            "customer_name": _person_name(row["first_name"], row["last_name"], row["email"]),
+            "customer_email": row["email"],
+            "computer_name": row["computer_name"],
+            "computer_type": row["computer_type"],
+            "serial_number": row["serial_number"],
+            "created_at": row["created_at"],
+            "repair_request_id": row["repair_request_id"],
+            "repair_number": row["repair_number"],
+            "repair_status": row["repair_status"],
+            "estimate_amount": (
+                float(row["estimate_amount"])
+                if row["estimate_amount"] is not None
+                else None
+            ),
+        }
+        for row in rows
+    ]
+
+
 def get_workspace_summary(technician_id: int) -> dict:
     with Session(engine) as s:
         assigned = s.execute(text("""

@@ -95,6 +95,27 @@ export async function getStoreSettings(): Promise<StoreSettings | null> {
   }
 }
 
+export async function updateStoreSettings(
+  settings: StoreSettings,
+): Promise<{ settings: StoreSettings | null; error: string }> {
+  try {
+    const res = await apiFetch("auth/store-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    });
+    if (!res.ok) {
+      return {
+        settings: null,
+        error: await readError(res, "Unable to save store settings."),
+      };
+    }
+    return { settings: await res.json(), error: "" };
+  } catch {
+    return { settings: null, error: "Unable to contact the server. Please try again." };
+  }
+}
+
 
 export async function login(email: string, password: string): Promise<UserSession | null>{
   const res = await fetch(`${API_URL}/auth/signin`, {

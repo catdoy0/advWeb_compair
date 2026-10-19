@@ -32,7 +32,7 @@ def _validate_preferred_datetime(body: CreateRepairRequestRequest):
     if (body.preferred_date - date.today()).days > 31:
         raise HTTPException(status_code=400, detail="Preferred date must be within 14 days")
 
-    if not (8 <= body.preferred_time.hour < 19):
+    if not (8 <= body.preferred_time.hour <= 19):
         raise HTTPException(status_code=400, detail="Preferred time must be between 8:00 and 19:00")
 
 
@@ -45,6 +45,18 @@ async def create_repair_request(
     if user.id is None:
         raise HTTPException(status_code=400, detail="User ID is required")
 
+    customer_id = user.id
+    is_admin = user.role in (UserRole.ADMIN, UserRole.SUPER_ADMIN)
+    if is_admin and body.customer_id is None:
+        raise HTTPException(status_code=400, detail="Select a customer for this repair request")
+    if body.customer_id is not None:
+        if not is_admin:
+            raise HTTPException(status_code=403, detail="Only administrators can select a customer")
+        customer = get_user_by_id(body.customer_id)
+        if customer is None or customer.role != UserRole.CUSTOMER:
+            raise HTTPException(status_code=404, detail="Customer not found")
+        customer_id = customer.id  # type: ignore[assignment]
+
     _validate_preferred_datetime(body)
 
     count = rr_sql.count_appointments_for_day(body.preferred_date)
@@ -55,10 +67,10 @@ async def create_repair_request(
         )
 
     # find-or-create the device for this customer
-    device = rr_sql.find_device(user.id, body.computer_name)
+    device = rr_sql.find_device(customer_id, body.computer_name)
     if device is None:
         device = rr_sql.create_device(
-            customer_id=user.id,
+            customer_id=customer_id,
             computer_name=body.computer_name,
             computer_type=body.computer_type,
             serial_number=body.serial_number,
@@ -68,7 +80,7 @@ async def create_repair_request(
         raise HTTPException(status_code=500, detail="Failed to create device")
 
     req = rr_sql.create_repair_request(
-        customer_id=user.id,
+        customer_id=customer_id,
         device_id=device.id,
         contact_detail=body.contact_detail,
         requested_service=body.requested_service,
@@ -87,11 +99,11 @@ async def create_repair_request(
     )
 
     conv = rr_sql.create_conversation_for_repair(
-        customer_id=user.id,
+        customer_id=customer_id,
         repair_request_id=req.id,
     )
 
-    customer = get_user_by_id(user.id)
+    customer = get_user_by_id(customer_id)
     customer_name = " ".join(
         p for p in [customer.first_name or "", customer.last_name or ""] if p # type: ignore
     ).strip() or customer.email # type: ignore
@@ -139,6 +151,15 @@ def list_my_devices(request: Request):
         raise HTTPException(status_code=400, detail="User ID is required")
 
     return rr_sql.list_devices_for_customer(user.id)
+
+
+@router.get("/devices")
+def list_team_devices(request: Request):
+    user = _require_user(request)
+    if user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return rr_sql.list_devices_for_team()
 
 
 @router.get("/workspace")

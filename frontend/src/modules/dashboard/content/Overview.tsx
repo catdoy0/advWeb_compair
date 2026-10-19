@@ -39,7 +39,7 @@ export default function Overview() {
   //   return <StaffOverview />;
   // }
 
-  if (role === "ADMIN") {
+  if (role === "ADMIN" || role === "SUPER_ADMIN") {
     return <AdminOverview />;
   }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import dayjs from "dayjs";
 
@@ -10,6 +10,8 @@ import { useEnterKey } from "../../../hooks/useModalKeys";
 import { useAuth } from "../../../context/AuthContext";
 import { createRepairRequest } from "../../../api/repair_requests";
 import type { ComputerType } from "../../../types/repair_requests";
+import { getUsers } from "../../../api/administration";
+import type { GetUser } from "../../../types/administration";
 
 const textareaClass =
   "w-full rounded-md border bg-white px-3 py-2 text-[12px] text-[#102c50] outline-none placeholder:text-slate-400 focus:border-[#2870e8] dark:bg-[#182536] dark:text-white resize-none transition-colors";
@@ -43,18 +45,23 @@ interface CreateRepairRequestModalProps {
   open: boolean;
   onClose: () => void;
   onUpdated: (scheduledDate: string) => void;
+  selectCustomer?: boolean;
 }
 
 export default function CreateRepairRequestModal({
   open,
   onClose,
   onUpdated,
+  selectCustomer = false,
 }: CreateRepairRequestModalProps) {
   const { session } = useAuth();
   const fullName = `${session?.user?.firstName || ""} ${session?.user?.lastName || ""}`.trim();
   const email = session?.user?.email || "";
 
   const [contactDetail, setContactDetail] = useState(email);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customers, setCustomers] = useState<GetUser[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<GetUser | null>(null);
   const [computer, setComputer] = useState("");
   const [computerType, setComputerType] = useState<ComputerType>("LAPTOP");
   const [serialNumber, setSerialNumber] = useState("");
@@ -69,6 +76,23 @@ export default function CreateRepairRequestModal({
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [messageModalMessage, setMessageModalMessage] = useState("");
   const [messageWasSuccess, setMessageWasSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!open || !selectCustomer) return;
+    let cancelled = false;
+    getUsers(30, 1, customerSearch, "CUSTOMER").then((result) => {
+      if (!cancelled) setCustomers(result ?? []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectCustomer, customerSearch]);
+
+  const customerName = selectCustomer
+    ? selectedCustomer
+      ? `${selectedCustomer.first_name ?? ""} ${selectedCustomer.last_name ?? ""}`.trim() || selectedCustomer.email
+      : ""
+    : fullName;
 
   const today = dayjs().startOf("day");
   const minDate = today.format("YYYY-MM-DD");
@@ -115,6 +139,7 @@ export default function CreateRepairRequestModal({
     if (submitting) return;
 
     const newErrors = {
+      customer: selectCustomer && !selectedCustomer ? "Select a customer." : "",
       computer: validateField("computer", computer),
       requestedService: validateField("requestedService", requestedService),
       reportedProblem: validateField("reportedProblem", reportedProblem),
@@ -130,6 +155,7 @@ export default function CreateRepairRequestModal({
     setSubmitting(true);
     try {
       const result = await createRepairRequest({
+        ...(selectCustomer && selectedCustomer ? { customer_id: selectedCustomer.id } : {}),
         computer_name: computer.trim(),
         computer_type: computerType,
         serial_number: serialNumber.trim() || null,
@@ -192,14 +218,47 @@ export default function CreateRepairRequestModal({
       <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4 border-t border-[#e6ebf2] pt-4 dark:border-slate-700">
         
         <div className="col-span-2 sm:col-span-1">
-          <CommonInput
-            variant="dashboard"
-            id="customerName"
-            label="Customer name"
-            value={fullName}
-            readOnly
-            className="cursor-not-allowed opacity-70"
-          />
+          {selectCustomer ? (
+            <>
+              <label className={labelClass} htmlFor="customerSearch">Customer</label>
+              <input
+                id="customerSearch"
+                value={customerSearch}
+                onChange={(event) => setCustomerSearch(event.target.value)}
+                placeholder="Search customer name or email"
+                className={`${selectClass} border-[#cfd9e8] dark:border-slate-600`}
+              />
+              <select
+                aria-label="Select customer"
+                value={selectedCustomer?.id ?? ""}
+                onChange={(event) => {
+                  const customer = customers.find((item) => item.id === Number(event.target.value)) ?? null;
+                  setSelectedCustomer(customer);
+                  setContactDetail(customer?.email ?? "");
+                  setErrors((previous) => ({ ...previous, customer: "" }));
+                }}
+                className={`${selectClass} mt-2 border-[#cfd9e8] dark:border-slate-600`}
+              >
+                <option value="">Choose a customer</option>
+                {customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {[customer.first_name, customer.last_name].filter(Boolean).join(" ") || customer.email} · {customer.email}
+                  </option>
+                ))}
+              </select>
+              {errors.customer && <p className="mt-1 text-xs font-medium text-red-500">{errors.customer}</p>}
+              {selectedCustomer && <p className="mt-1 text-[10px] text-slate-400">Selected: {customerName}</p>}
+            </>
+          ) : (
+            <CommonInput
+              variant="dashboard"
+              id="customerName"
+              label="Customer name"
+              value={customerName}
+              readOnly
+              className="cursor-not-allowed opacity-70"
+            />
+          )}
         </div>
 
         <div className="col-span-2 sm:col-span-1">

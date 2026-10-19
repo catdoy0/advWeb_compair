@@ -14,6 +14,7 @@ from src.config import (
     GOOGLE_CLIENT_ID,
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
+from src.models.users import UserRole
 from src.schemas.auth import (
     CheckEmailRequest,
     GoogleSignInRequest,
@@ -23,7 +24,8 @@ from src.schemas.auth import (
     PasswordResetSendCodeRequest,
     SignUpRequest,
 )
-from src.security.auth import send_reset_pass
+from src.schemas.store_settings import StoreSettings
+from src.security.auth import check_user_role, send_reset_pass
 from src.security.tokens import (
     create_password_reset_token,
     decode_access_token,
@@ -37,7 +39,11 @@ from src.services.auth import (
     signin_user,
     signup_user,
 )
-from src.services.store_settings import read_settings, serialize_store_settings
+from src.services.store_settings import (
+    read_settings,
+    serialize_store_settings,
+    write_settings,
+)
 from src.sql import auth as auth_sql
 from src.sql import password_reset as password_reset_sql
 
@@ -71,6 +77,22 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
 
 @router.get("/store-settings")
 def get_store_settings():
+    return serialize_store_settings(read_settings())
+
+
+@router.put("/store-settings")
+def update_store_settings(
+    data: StoreSettings,
+    request: Request,
+    response: Response,
+):
+    if not check_user_role(request, response, [UserRole.SUPER_ADMIN, UserRole.ADMIN]):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to update store settings",
+        )
+
+    write_settings(data)
     return serialize_store_settings(read_settings())
 
 
