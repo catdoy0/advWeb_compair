@@ -20,6 +20,7 @@ def get_general_conversation(customer_id: int) -> Conversations | None:
             select(Conversations)
             .where(Conversations.customer_id == customer_id)
             .where(Conversations.repair_request_id == None)
+            .where(Conversations.archived_at.is_(None))
         ).first()
 
 
@@ -91,6 +92,7 @@ def list_conversations_for_team(user_id: int) -> list[dict]:
                 u.last_name,
                 u.email,
                 rr.repair_number,
+                rr.status AS repair_status,
                 d.computer_name,
                 m.content AS last_message,
                 unread.count AS unread_count
@@ -115,6 +117,8 @@ def list_conversations_for_team(user_id: int) -> list[dict]:
                   AND (cr.last_read_message_id IS NULL
                        OR unread_message.id > cr.last_read_message_id)
             ) unread ON TRUE
+            WHERE c.archived_at IS NULL
+              AND u.archived_at IS NULL
             ORDER BY c.last_message_at DESC
         """), {"uid": user_id}).mappings().all()
             # WHERE NOT EXISTS (
@@ -175,7 +179,7 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
                   AND (cr.last_read_message_id IS NULL
                        OR unread_message.id > cr.last_read_message_id)
             ) unread ON TRUE
-            WHERE c.customer_id = :cid
+            WHERE c.customer_id = :cid AND c.archived_at IS NULL
             ORDER BY c.repair_request_id IS NULL DESC, c.last_message_at DESC
         """), {"cid": customer_id}).mappings().all()
 
@@ -213,6 +217,7 @@ def search_conversations_for_team(
                 u.last_name,
                 u.email,
                 rr.repair_number,
+                rr.status AS repair_status,
                 d.computer_name,
                 m.content AS last_message,
                 unread.count AS unread_count,
@@ -239,12 +244,16 @@ def search_conversations_for_team(
                   AND (cr.last_read_message_id IS NULL
                        OR unread_message.id > cr.last_read_message_id)
             ) unread ON TRUE
-            WHERE :search = ''
-               OR concat_ws(' ', u.first_name, u.last_name) ILIKE :pattern
-               OR u.email ILIKE :pattern
-               OR COALESCE(rr.repair_number, '') ILIKE :pattern
-               OR COALESCE(d.computer_name, '') ILIKE :pattern
-               OR COALESCE(m.content, '') ILIKE :pattern
+            WHERE c.archived_at IS NULL
+              AND u.archived_at IS NULL
+              AND (
+                   :search = ''
+                   OR concat_ws(' ', u.first_name, u.last_name) ILIKE :pattern
+                   OR u.email ILIKE :pattern
+                   OR COALESCE(rr.repair_number, '') ILIKE :pattern
+                   OR COALESCE(d.computer_name, '') ILIKE :pattern
+                   OR COALESCE(m.content, '') ILIKE :pattern
+              )
             ORDER BY c.last_message_at DESC, c.id DESC
             LIMIT :fetch_limit OFFSET :offset
         """), {
@@ -273,6 +282,7 @@ def search_conversations_for_customer(
                 c.repair_request_id,
                 c.last_message_at,
                 rr.repair_number,
+                rr.status AS repair_status,
                 d.computer_name,
                 m.content AS last_message,
                 unread.count AS unread_count,
@@ -298,7 +308,7 @@ def search_conversations_for_customer(
                   AND (cr.last_read_message_id IS NULL
                        OR unread_message.id > cr.last_read_message_id)
             ) unread ON TRUE
-            WHERE c.customer_id = :cid
+            WHERE c.customer_id = :cid AND c.archived_at IS NULL
               AND (
                     :search = ''
                     OR CASE WHEN c.repair_request_id IS NULL
@@ -411,7 +421,7 @@ def get_unread_count_for_customer(customer_id: int) -> int:
             LEFT JOIN conversation_reads cr
                 ON cr.conversation_id = c.id
                AND cr.user_id = :cid
-            WHERE c.customer_id = :cid
+            WHERE c.customer_id = :cid AND c.archived_at IS NULL
               AND m.sender_id != :cid
               AND (cr.last_read_message_id IS NULL OR m.id > cr.last_read_message_id)
         """), {"cid": customer_id}).scalar_one()
@@ -441,3 +451,96 @@ def mark_conversation_read(conversation_id: int, user_id: int) -> None:
             "now": _now(),
         })
         s.commit()
+
+
+def archive_conversation(conversation_id: int) -> bool:
+    with Session(engine) as s:
+        result = s.execute(text("""
+            UPDATE conversations c
+            SET archived_at = :now
+            WHERE c.id = :id
+              AND c.archived_at IS NULL
+              AND c.repair_request_id IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM repair_requests rr
+                  WHERE rr.id = c.repair_request_id
+                    AND rr.status IN ('COMPLETED', 'RELEASED', 'REJECTED')
+              )
+        """), {"id": conversation_id, "now": _now()})
+        s.commit()
+        return result.rowcount > 0
+
+
+def can_archive_conversation(conversation_id: int) -> bool | None:
+    with Session(engine) as s:
+        row = s.execute(text("""
+            SELECT c.archived_at, c.repair_request_id, rr.status
+            FROM conversations c
+            LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
+            WHERE c.id = :id
+        """), {"id": conversation_id}).mappings().first()
+    if row is None:
+        return None
+    return (
+        row["archived_at"] is None
+        and row["repair_request_id"] is not None
+        and row["status"] in {"COMPLETED", "RELEASED", "REJECTED"}
+    )
+
+
+def restore_conversation(conversation_id: int) -> bool:
+    with Session(engine) as s:
+        result = s.execute(text("""
+            UPDATE conversations
+            SET archived_at = NULL
+            WHERE id = :id AND archived_at IS NOT NULL
+        """), {"id": conversation_id})
+        s.commit()
+        return result.rowcount > 0
+
+
+def list_archived_conversations(search: str, limit: int, offset: int) -> dict:
+    pattern = f"%{search.strip()}%"
+    with Session(engine) as s:
+        total = s.execute(text("""
+            SELECT COUNT(*)
+            FROM conversations c
+            JOIN users u ON u.id = c.customer_id
+            LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
+            LEFT JOIN devices d ON d.id = rr.device_id
+            WHERE c.archived_at IS NOT NULL
+              AND c.repair_request_id IS NOT NULL
+              AND rr.status IN ('COMPLETED', 'RELEASED', 'REJECTED')
+              AND (:search = '' OR u.email ILIKE :pattern
+                   OR concat_ws(' ', u.first_name, u.last_name) ILIKE :pattern
+                   OR COALESCE(rr.repair_number, '') ILIKE :pattern
+                   OR COALESCE(d.computer_name, '') ILIKE :pattern)
+        """), {"search": search.strip(), "pattern": pattern}).scalar_one()
+        rows = s.execute(text("""
+            SELECT c.id, c.customer_id, c.repair_request_id, c.archived_at,
+                   u.first_name, u.last_name, u.email,
+                   rr.repair_number, rr.status AS repair_status, d.computer_name,
+                   latest.content AS preview
+            FROM conversations c
+            JOIN users u ON u.id = c.customer_id
+            LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
+            LEFT JOIN devices d ON d.id = rr.device_id
+            LEFT JOIN LATERAL (
+                SELECT content FROM messages
+                WHERE conversation_id = c.id
+                ORDER BY created_at DESC, id DESC LIMIT 1
+            ) latest ON TRUE
+            WHERE c.archived_at IS NOT NULL
+              AND c.repair_request_id IS NOT NULL
+              AND rr.status IN ('COMPLETED', 'RELEASED', 'REJECTED')
+              AND (:search = '' OR u.email ILIKE :pattern
+                   OR concat_ws(' ', u.first_name, u.last_name) ILIKE :pattern
+                   OR COALESCE(rr.repair_number, '') ILIKE :pattern
+                   OR COALESCE(d.computer_name, '') ILIKE :pattern)
+            ORDER BY c.archived_at DESC, c.id DESC
+            LIMIT :limit OFFSET :offset
+        """), {
+            "search": search.strip(), "pattern": pattern,
+            "limit": limit, "offset": offset,
+        }).mappings().all()
+    return {"items": [dict(row) for row in rows], "total": total}

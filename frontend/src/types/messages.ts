@@ -6,6 +6,7 @@ export interface Conversation {
   customer_name: string | null;
   customer_email: string | null;
   repair_number: string | null;
+  repair_status: string | null;
   device_label: string | null;
   preview: string | null;
   unread_count: number;

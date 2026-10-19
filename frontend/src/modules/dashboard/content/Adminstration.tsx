@@ -18,6 +18,7 @@ import { useAccountsAdmin } from "../../../hooks/administration";
 const accountColumns = (
   onEdit: (account: Account) => void,
   onSuspend: (account: Account) => void,
+  onArchive: (account: Account) => void,
 ): DataTableColumn<Account>[] => [
   {
     key: "account",
@@ -58,6 +59,7 @@ const accountColumns = (
         account={account}
         onEdit={onEdit}
         onSuspend={onSuspend}
+        onArchive={onArchive}
       />
     ),
   },
@@ -66,7 +68,11 @@ const accountColumns = (
 export default function Adminstration() {
   const admin = useAccountsAdmin();
 
-  const columns = accountColumns(admin.handleEditClick, admin.handleSuspendClick);
+  const columns = accountColumns(
+    admin.handleEditClick,
+    admin.handleSuspendClick,
+    admin.handleArchiveClick,
+  );
 
   return (
     <DashboardPage maxWidth="1240px" className="flex-1 bg-[#f7f9fc] dark:bg-[#0f1724]">
@@ -90,6 +96,15 @@ export default function Adminstration() {
             ? "They will be able to sign in again once access is restored."
             : "They will no longer be able to sign in until access is restored."
         }
+      />
+
+      <AreYouSureModal
+        open={admin.archiveModalOpen}
+        onClose={admin.handleArchiveClose}
+        onConfirm={admin.handleArchiveConfirm}
+        header={`Archive ${admin.accountToArchive?.name ?? "account"}`}
+        description="This account will no longer be able to sign in or appear in active account lists. Its repair and message history will be kept. You can restore it from Archive."
+        confirmLabel="Archive account"
       />
 
       <EditAccountModal

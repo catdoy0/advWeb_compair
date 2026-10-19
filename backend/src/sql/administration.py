@@ -110,6 +110,7 @@ def get_admin_overview(on_date: date, user_id: int) -> dict:
                   AND (cr.last_read_message_id IS NULL
                        OR m.id > cr.last_read_message_id)
             ) unread ON TRUE
+            WHERE c.archived_at IS NULL AND u.archived_at IS NULL
             ORDER BY c.last_message_at DESC, c.id DESC
             LIMIT 3
         """), {"user_id": user_id}).mappings().all()
@@ -118,9 +119,11 @@ def get_admin_overview(on_date: date, user_id: int) -> dict:
             SELECT COUNT(*)
             FROM messages m
             JOIN conversations c ON c.id = m.conversation_id
+            JOIN users u ON u.id = c.customer_id
             LEFT JOIN conversation_reads cr
               ON cr.conversation_id = c.id AND cr.user_id = :user_id
-            WHERE m.sender_id != :user_id
+            WHERE c.archived_at IS NULL AND u.archived_at IS NULL
+              AND m.sender_id != :user_id
               AND (cr.last_read_message_id IS NULL
                    OR m.id > cr.last_read_message_id)
         """), {"user_id": user_id}).scalar_one()
@@ -221,15 +224,17 @@ def get_customers(page: int, page_size: int, search: str) -> dict:
                 ) AS returning_customers,
                 (SELECT COUNT(*) FROM devices d
                  JOIN users customer ON customer.id = d.customer_id
-                 WHERE customer.role = 'CUSTOMER') AS devices_on_record
+                 WHERE customer.role = 'CUSTOMER'
+                   AND customer.archived_at IS NULL) AS devices_on_record
             FROM users u
-            WHERE u.role = 'CUSTOMER'
+            WHERE u.role = 'CUSTOMER' AND u.archived_at IS NULL
         """)).mappings().one()
 
         total = s.execute(text("""
             SELECT COUNT(*)
             FROM users u
             WHERE u.role = 'CUSTOMER'
+              AND u.archived_at IS NULL
               AND (
                   :search = ''
                   OR u.first_name ILIKE :pattern
@@ -249,6 +254,7 @@ def get_customers(page: int, page_size: int, search: str) -> dict:
             LEFT JOIN devices d ON d.customer_id = u.id
             LEFT JOIN repair_requests rr ON rr.customer_id = u.id
             WHERE u.role = 'CUSTOMER'
+              AND u.archived_at IS NULL
               AND (
                   :search = ''
                   OR u.first_name ILIKE :pattern
@@ -293,6 +299,7 @@ def get_users(how_many: int = 10, page: int = 1, search: str = "", role: str = "
                 sql = text("""
                     SELECT * FROM users
                     WHERE (first_name ILIKE :search OR last_name ILIKE :search OR email ILIKE :search)
+                    AND archived_at IS NULL
                     AND role IN ('ADMIN', 'SUPER_ADMIN')
                     ORDER BY id
                     LIMIT :limit OFFSET :offset
@@ -306,6 +313,7 @@ def get_users(how_many: int = 10, page: int = 1, search: str = "", role: str = "
                 sql = text("""
                     SELECT * FROM users
                     WHERE (first_name ILIKE :search OR last_name ILIKE :search OR email ILIKE :search)
+                    AND archived_at IS NULL
                     AND role = CAST(:role AS userrole)
                     ORDER BY id
                     LIMIT :limit OFFSET :offset
@@ -320,6 +328,7 @@ def get_users(how_many: int = 10, page: int = 1, search: str = "", role: str = "
                 sql = text("""
                     SELECT * FROM users
                     WHERE (first_name ILIKE :search OR last_name ILIKE :search OR email ILIKE :search)
+                    AND archived_at IS NULL
                     ORDER BY id
                     LIMIT :limit OFFSET :offset
                 """)
@@ -350,10 +359,12 @@ def get_users(how_many: int = 10, page: int = 1, search: str = "", role: str = "
 def get_total_users():
     with Session(engine) as s:
         rows = s.exec(
-            select(Users.role, func.count()).group_by(Users.role)
+            select(Users.role, func.count())
+            .where(Users.archived_at.is_(None))
+            .group_by(Users.role)
         ).all()
 
-    counts = {role: count for role, count in rows}
+    counts = {role.value: count for role, count in rows}
 
     return {
         "total_accounts": sum(counts.values()),
@@ -411,6 +422,7 @@ def count_active_super_admins() -> int:
             .select_from(Users)
             .where(Users.role == UserRole.SUPER_ADMIN)
             .where(Users.is_active == True)
+            .where(Users.archived_at.is_(None))
         ).one()
 
 
@@ -420,6 +432,55 @@ def get_user_state(user_id: int) -> tuple[str, bool] | None:
         if not user:
             return None
         return user.role.value, user.is_active
+
+
+def archive_user(user_id: int) -> bool:
+    with Session(engine) as s:
+        user = s.get(Users, user_id)
+        if user is None or user.archived_at is not None:
+            return False
+        user.archived_at = datetime.now(timezone.utc)
+        s.commit()
+        return True
+
+
+def restore_user(user_id: int) -> bool:
+    with Session(engine) as s:
+        user = s.get(Users, user_id)
+        if user is None or user.archived_at is None:
+            return False
+        user.archived_at = None
+        s.commit()
+        return True
+
+
+def list_archived_users(search: str, limit: int, offset: int) -> dict:
+    pattern = f"%{search.strip()}%"
+    with Session(engine) as s:
+        total = s.execute(text("""
+            SELECT COUNT(*) FROM users u
+            WHERE u.archived_at IS NOT NULL
+              AND (:search = '' OR u.first_name ILIKE :pattern
+                   OR u.last_name ILIKE :pattern
+                   OR concat_ws(' ', u.first_name, u.last_name) ILIKE :pattern
+                   OR u.email ILIKE :pattern)
+        """), {"search": search.strip(), "pattern": pattern}).scalar_one()
+        rows = s.execute(text("""
+            SELECT u.id, u.first_name, u.last_name, u.email, u.role,
+                   u.is_active, u.created_at, u.last_sign_in, u.archived_at
+            FROM users u
+            WHERE u.archived_at IS NOT NULL
+              AND (:search = '' OR u.first_name ILIKE :pattern
+                   OR u.last_name ILIKE :pattern
+                   OR concat_ws(' ', u.first_name, u.last_name) ILIKE :pattern
+                   OR u.email ILIKE :pattern)
+            ORDER BY u.archived_at DESC, u.id DESC
+            LIMIT :limit OFFSET :offset
+        """), {
+            "search": search.strip(), "pattern": pattern,
+            "limit": limit, "offset": offset,
+        }).mappings().all()
+    return {"items": [dict(row) for row in rows], "total": total}
 
 
 

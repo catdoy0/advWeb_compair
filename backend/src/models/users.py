@@ -22,6 +22,7 @@ class Users(SQLModel, table=True):
     is_active: bool = Field(default=True)
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    archived_at: datetime | None = Field(default=None, index=True)
 
     updated_at: datetime | None = None
     last_sign_in: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -34,6 +34,27 @@ def assert_database_ready() -> bool:
     return True
 
 
+def ensure_archive_columns() -> None:
+    """Add the soft-archive timestamps to existing databases, safely on startup."""
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ"
+        )
+        conn.exec_driver_sql(
+            "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ"
+        )
+        conn.exec_driver_sql("""
+            UPDATE conversations c
+            SET archived_at = NULL
+            WHERE c.archived_at IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM repair_requests rr
+                  WHERE rr.id = c.repair_request_id
+                    AND rr.status IN ('COMPLETED', 'RELEASED', 'REJECTED')
+              )
+        """)
+
+
 DEFAULT_ROOT_EMAIL = "compair@gmail.com"
 DEFAULT_ROOT_PASSWORD = "root"
 

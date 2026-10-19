@@ -69,7 +69,7 @@ def signin_user(data: LoginRequest) -> tuple[Users, str, str]:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
-    if not user.is_active:
+    if not user.is_active or user.archived_at is not None:
         raise HTTPException(status_code=403, detail="Account is disabled")
 
     auth_sql.delete_expired_refresh()
@@ -93,7 +93,7 @@ def signin_google_user(claims: dict) -> tuple[Users, str, str]:
     if user is None:
         existing = auth_sql.get_user_record_by_email(email)
         if existing is not None:
-            if not existing.is_active:
+            if not existing.is_active or existing.archived_at is not None:
                 raise HTTPException(status_code=403, detail="Account is disabled")
 
             # Google is authoritative for Gmail addresses and verified Workspace accounts.
@@ -138,7 +138,7 @@ def signin_google_user(claims: dict) -> tuple[Users, str, str]:
 
     if user is None:
         raise HTTPException(status_code=409, detail="Unable to link this Google account")
-    if not user.is_active:
+    if not user.is_active or user.archived_at is not None:
         raise HTTPException(status_code=403, detail="Account is disabled")
 
     auth_sql.delete_expired_refresh()
@@ -161,7 +161,7 @@ def refresh_session(raw_token: str | None) -> tuple[Users, str]:
         raise HTTPException(status_code=401, detail="Refresh token is expired")
 
     user = auth_sql.get_user_by_id(row.user_id)
-    if not user:
+    if not user or user.archived_at is not None or not user.is_active:
         auth_sql.delete_refresh(row.id)
         raise HTTPException(status_code=401, detail="Account is unavailable")
 
@@ -198,7 +198,7 @@ def require_active_user(request: Request) -> Users:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     user = auth_sql.get_user_by_id(user_id)
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or user.archived_at is not None:
         raise HTTPException(status_code=403, detail="Account is unavailable")
 
     return user

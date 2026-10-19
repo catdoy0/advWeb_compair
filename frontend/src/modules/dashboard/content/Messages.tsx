@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronRight, MessageCircle, Search } from "lucide-react";
+import { Archive, ChevronRight, MessageCircle, Search } from "lucide-react";
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
+import AreYouSureModal from "../../../components/common/modals/AreYouSureModal";
 import PageHeader from "../components/PageHeader";
 import UserAvatar from "../../../components/common/widgets/UserAvatar";
 import DashboardPage from "../components/DashboardPage";
@@ -17,6 +18,7 @@ import {
 } from "../../../api/conversations";
 import { useMessageEvents } from "../../../hooks/useMessageEvents";
 import type { Conversation, Message } from "../../../types/messages";
+import { archiveConversation } from "../../../api/administration";
 import dayjs from "dayjs";
 import calendar from "dayjs/plugin/calendar";
 dayjs.extend(calendar);
@@ -85,6 +87,9 @@ export default function Messages() {
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [conversationRefreshTick, setConversationRefreshTick] = useState(0);
   const [sending, setSending] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [archiveError, setArchiveError] = useState("");
 
   const conversationListRef = useRef<HTMLDivElement | null>(null);
   const conversationOffsetRef = useRef(0);
@@ -223,16 +228,49 @@ export default function Messages() {
     }
   }
 
+  async function handleArchiveConversation() {
+    if (!selectedConversation || archiving) return;
+    setArchiving(true);
+    setArchiveError("");
+    const result = await archiveConversation(selectedConversation.id);
+    if (result.ok) {
+      setSelectedId(null);
+      setMessages([]);
+      setConversationRefreshTick((tick) => tick + 1);
+    } else {
+      setArchiveError(result.message);
+    }
+    setArchiving(false);
+  }
+
   const selectedConversation =
     conversations.find((c) => c.id === selectedId) ?? null;
+  const canArchiveSelected = Boolean(
+    selectedConversation?.repair_request_id !== null &&
+    selectedConversation?.repair_request_id !== undefined &&
+    ["COMPLETED", "RELEASED", "REJECTED"].includes(selectedConversation.repair_status ?? ""),
+  );
 
   return (
     <DashboardPage className="max-h-[calc(100vh-5rem)]">
+      <AreYouSureModal
+        open={archiveConfirmOpen}
+        onClose={() => setArchiveConfirmOpen(false)}
+        onConfirm={handleArchiveConversation}
+        header="Archive conversation"
+        description="This repair conversation will be removed from the inbox. Its messages will be kept and can be restored from Archive."
+        confirmLabel="Archive conversation"
+      />
       <PageHeader
         eyebrow="Customer care / inbox"
         title="Service messages"
         description="Keep repair conversations attached to the request so customers always know what happens next."
       />
+      {archiveError && (
+        <p role="alert" className="mt-3 text-[11px] text-red-600 dark:text-red-400">
+          {archiveError}
+        </p>
+      )}
 
       <div className="mt-6 grid h-[calc(100vh-220px)] min-h-[500px] max-h-[700px] gap-4 lg:grid-cols-[373px_minmax(0,1fr)]">
         {/* Inbox */}
@@ -372,7 +410,7 @@ export default function Messages() {
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#dceaff] text-[10px] font-bold text-[#2870e8]">
                   {initialsOf(conversationTitle(selectedConversation, isCustomer))}
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-bold text-[#102c50] dark:text-white">
                     {conversationTitle(selectedConversation, isCustomer)}
                   </p>
@@ -380,6 +418,18 @@ export default function Messages() {
                     {conversationSubtitle(selectedConversation, isCustomer)}
                   </p>
                 </div>
+                {(currentUser.role === "ADMIN" || currentUser.role === "SUPER_ADMIN") && canArchiveSelected && (
+                  <button
+                    type="button"
+                    onClick={() => setArchiveConfirmOpen(true)}
+                    disabled={archiving}
+                    title="Archive conversation"
+                    className="flex shrink-0 items-center gap-1.5 rounded-md border border-[#d8e0eb] px-2.5 py-2 text-[10px] font-semibold text-slate-600 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    <Archive size={13} />
+                    {archiving ? "Archiving..." : "Archive"}
+                  </button>
+                )}
               </div>
 
               <div

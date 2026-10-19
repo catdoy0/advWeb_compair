@@ -669,6 +669,7 @@ def list_devices_for_team() -> list[dict]:
                 LIMIT 1
             ) rr ON TRUE
             LEFT JOIN repairs r ON r.repair_request_id = rr.id
+            WHERE u.archived_at IS NULL
             ORDER BY d.created_at DESC, d.id DESC
         """)).mappings().all()
 

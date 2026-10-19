@@ -30,7 +30,7 @@ const myDevicesItem = { label: "My Devices", href: dashboardPath(D.MY_DEVICES), 
 const profileItem = { label: "Profile", href: dashboardPath(D.PROFILE), icon: UserRound };
 const administrationItem = { label: "Administration", href: dashboardPath(D.ADMINISTRATION), icon: ShieldCheck };
 const settingsItem = { label: "Settings", href: dashboardPath(D.SETTINGS), icon: Settings };
-const archiveItem = { label: "TODO:Archive", href: dashboardPath(D.ARCHIVE), icon: Archive };
+const archiveItem = { label: "Archive", href: dashboardPath(D.ARCHIVE), icon: Archive };
 
 const workspaceItem = { label: "Workspace", href: dashboardPath(D.WORKSPACE), icon: LayoutDashboard };
 const repairQueueItem = { label: "Repair Queue", href: dashboardPath(D.REPAIR_QUEUE), icon: Wrench };
@@ -82,6 +82,7 @@ const adminSections: DashboardSidebarSection[] = [
     label: "Manage",
     items: [techniciansItem, staffItem, reportsItem, settingsItem, profileItem],
   },
+  // { label: "System", items: [archiveItem] },
 ];
 
 const superAdminSections: DashboardSidebarSection[] = [

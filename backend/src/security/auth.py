@@ -36,7 +36,12 @@ def check_user_role(
 
             user_id = int(claims["sub"])
             user = auth_sql.get_user_by_id(user_id)
-            if user is not None and user.role.value == claims["role"]:
+            if (
+                user is not None
+                and user.archived_at is None
+                and user.is_active
+                and user.role.value == claims["role"]
+            ):
                 return user.role in allowed_roles
 
         except (PyJWTError, KeyError, TypeError, ValueError):

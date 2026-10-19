@@ -48,6 +48,7 @@ def list_conversations(
             "customer_name": None,
             "customer_email": None,
             "repair_number": row["repair_number"],
+            "repair_status": row["repair_status"],
             "device_label": row["computer_name"],
             "preview": row["last_message"],
             "unread_count": row["unread_count"],
@@ -73,7 +74,7 @@ def get_conversation(conversation_id: int, request: Request):
     user = _require_user(request)
 
     conv = conv_sql.get_conversation(conversation_id)
-    if conv is None:
+    if conv is None or conv.archived_at is not None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     if user.role == UserRole.CUSTOMER and conv.customer_id != user.id:
@@ -93,7 +94,7 @@ def mark_read(conversation_id: int, request: Request):
     user = _require_user(request)
 
     conv = conv_sql.get_conversation(conversation_id)
-    if conv is None:
+    if conv is None or conv.archived_at is not None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     if user.role == UserRole.CUSTOMER and conv.customer_id != user.id:
@@ -116,7 +117,7 @@ def get_messages(
     user = _require_user(request)
 
     conv = conv_sql.get_conversation(conversation_id)
-    if conv is None:
+    if conv is None or conv.archived_at is not None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     if user.role == UserRole.CUSTOMER and conv.customer_id != user.id:
@@ -155,7 +156,7 @@ async def send_message(
     user = _require_user(request)
 
     conv = conv_sql.get_conversation(conversation_id)
-    if conv is None:
+    if conv is None or conv.archived_at is not None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     if user.role == UserRole.CUSTOMER and conv.customer_id != user.id:

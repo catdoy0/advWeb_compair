@@ -20,3 +20,4 @@ class Conversations(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_message_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
+    archived_at: datetime | None = Field(default=None, index=True)

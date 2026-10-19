@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { GetUser, TotalUsers } from "../types/administration";
-import { getUsers, getTotalUsers, setUserActive, editUser, resetPassword } from "../api/administration";
+import { getUsers, getTotalUsers, setUserActive, editUser, resetPassword, archiveAccount } from "../api/administration";
 import { toAccount } from "../modules/dashboard/content/administration/accountUtils";
 import type {
   Account,
@@ -32,6 +32,8 @@ export function useAccountsAdmin() {
 
   const [suspendModalOpen, setSuspendModalOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
+  const [accountToArchive, setAccountToArchive] = useState<Account | null>(null);
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<GetUser | null>(null);
@@ -134,6 +136,26 @@ export function useAccountsAdmin() {
     );
   };
 
+  const handleArchiveClick = (account: Account) => {
+    setAccountToArchive(account);
+    setArchiveModalOpen(true);
+  };
+
+  const handleArchiveClose = () => {
+    setArchiveModalOpen(false);
+    setAccountToArchive(null);
+  };
+
+  const handleArchiveConfirm = async () => {
+    if (!accountToArchive) return;
+    const result = await archiveAccount(accountToArchive.raw.id);
+    setArchiveModalOpen(false);
+    setAccountToArchive(null);
+    setMessageModalMessage(result.message);
+    setMessageModalOpen(true);
+    if (result.ok) await reload();
+  };
+
   const totalAccounts = totals?.total_accounts ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalAccounts / PAGE_SIZE));
   const customerCount = totals?.customer_total ?? 0;
@@ -165,6 +187,13 @@ export function useAccountsAdmin() {
     handleSuspendClick,
     handleSuspendClose,
     handleSuspendConfirm,
+
+    // archive modal
+    archiveModalOpen,
+    accountToArchive,
+    handleArchiveClick,
+    handleArchiveClose,
+    handleArchiveConfirm,
 
     // edit modal
     editModalOpen,

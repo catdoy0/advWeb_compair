@@ -8,6 +8,7 @@ from src.security.auth import check_user_role
 from src.services.auth import get_current_user_id
 from src.sql import administration as admin_sql
 from src.sql import auth as auth_sql
+from src.sql import conversation as conversation_sql
 
 router = APIRouter()
 
@@ -124,6 +125,98 @@ def set_user_active(
             )
 
     return admin_sql.set_user_active(user_id, is_active)
+
+
+@router.get("/archive/messages")
+def get_archived_messages(
+    request: Request,
+    response: Response,
+    search: str = Query("", max_length=200),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=50),
+):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="You do not have permission to view archived messages")
+    return conversation_sql.list_archived_conversations(search, page_size, (page - 1) * page_size)
+
+
+@router.post("/archive/messages/{conversation_id}")
+def archive_message_conversation(
+    conversation_id: int,
+    request: Request,
+    response: Response,
+):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="You do not have permission to archive messages")
+    eligible = conversation_sql.can_archive_conversation(conversation_id)
+    if eligible is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if not eligible:
+        raise HTTPException(
+            status_code=400,
+            detail="Only repair conversations with a completed, released, or rejected request can be archived",
+        )
+    if not conversation_sql.archive_conversation(conversation_id):
+        raise HTTPException(status_code=409, detail="Conversation changed before it could be archived")
+    return {"message": "Conversation archived."}
+
+
+@router.post("/archive/messages/{conversation_id}/restore")
+def restore_message_conversation(
+    conversation_id: int,
+    request: Request,
+    response: Response,
+):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="You do not have permission to restore messages")
+    if not conversation_sql.restore_conversation(conversation_id):
+        raise HTTPException(status_code=404, detail="Archived conversation not found")
+    return {"message": "Conversation restored."}
+
+
+@router.get("/archive/accounts")
+def get_archived_accounts(
+    request: Request,
+    response: Response,
+    search: str = Query("", max_length=200),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=50),
+):
+    if not check_user_role(request, response, [UserRole.SUPER_ADMIN]):
+        raise HTTPException(status_code=403, detail="Only super admins can view archived accounts")
+    return admin_sql.list_archived_users(search, page_size, (page - 1) * page_size)
+
+
+@router.post("/archive/accounts/{user_id}")
+def archive_account(user_id: int, request: Request, response: Response):
+    if not check_user_role(request, response, [UserRole.SUPER_ADMIN]):
+        raise HTTPException(status_code=403, detail="Only super admins can archive accounts")
+
+    if get_current_user_id(request) == user_id:
+        raise HTTPException(status_code=400, detail="You cannot archive your own account")
+
+    state = admin_sql.get_user_state(user_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    target_role, target_is_active = state
+    if (
+        target_role == UserRole.SUPER_ADMIN.value
+        and target_is_active
+        and admin_sql.count_active_super_admins() <= 1
+    ):
+        raise HTTPException(status_code=400, detail="Cannot archive the last active super admin")
+    if not admin_sql.archive_user(user_id):
+        raise HTTPException(status_code=404, detail="Account not found or already archived")
+    return {"message": "Account archived."}
+
+
+@router.post("/archive/accounts/{user_id}/restore")
+def restore_account(user_id: int, request: Request, response: Response):
+    if not check_user_role(request, response, [UserRole.SUPER_ADMIN]):
+        raise HTTPException(status_code=403, detail="Only super admins can restore accounts")
+    if not admin_sql.restore_user(user_id):
+        raise HTTPException(status_code=404, detail="Archived account not found")
+    return {"message": "Account restored."}
 
 
 @router.post("/edit-user")

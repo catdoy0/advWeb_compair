@@ -234,7 +234,12 @@ def check_session(response: Response, request: Request):
             user = auth_sql.get_user_by_id(user_id)
 
             store_settings = read_settings()
-            if user is not None and user.role.value == claims["role"]:
+            if (
+                user is not None
+                and user.archived_at is None
+                and user.is_active
+                and user.role.value == claims["role"]
+            ):
                 return {
                     "user": serialize_user(user),
                     "store_settings": serialize_store_settings(store_settings)
