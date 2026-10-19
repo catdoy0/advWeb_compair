@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { KeyRound, Save, ShieldCheck, ShieldOff } from "lucide-react";
 
 import Modal from "../../../../components/common/modals/Modal";
@@ -6,6 +7,7 @@ import type { GetUser } from "../../../../types/administration";
 import MessageModal from "../../../../components/common/modals/MessageModal";
 import { useEnterKey } from "../../../../hooks/useModalKeys";
 import { useEditAccountForm } from "../../../../hooks/administration";
+import { listRepairQueue } from "../../../../api/repair_requests";
 
 const inputClass =
   "h-10 w-full rounded-md border border-[#cfd9e8] bg-white px-3 text-[12px] text-[#102c50] outline-none placeholder:text-slate-400 focus:border-[#2870e8] dark:border-slate-600 dark:bg-[#182536] dark:text-white";
@@ -53,6 +55,32 @@ function EditAccountForm({
   onUpdated,
 }: EditAccountModalProps & { user: GetUser }) {
   const form = useEditAccountForm(user, onUpdated);
+  const [openAssignedJobs, setOpenAssignedJobs] = useState<number | null>(null);
+  const [assignmentCheckError, setAssignmentCheckError] = useState("");
+
+  useEffect(() => {
+    if (!open || user.role !== "TECHNICIAN") {
+      setOpenAssignedJobs(0);
+      setAssignmentCheckError("");
+      return;
+    }
+
+    let cancelled = false;
+    setOpenAssignedJobs(null);
+    setAssignmentCheckError("");
+    void listRepairQueue().then((queue) => {
+      if (queue.error) throw new Error(queue.error);
+      const openStatuses = new Set(["PENDING", "RECEIVED", "DIAGNOSING", "REPAIRING", "COMPLETED"]);
+      const count = queue.items.filter(
+        (repair) => repair.technician_id === user.id && openStatuses.has(repair.status),
+      ).length;
+      if (!cancelled) setOpenAssignedJobs(count);
+    }).catch(() => {
+      if (!cancelled) setAssignmentCheckError("Could not verify this technician’s assigned repairs. Role changes are locked until the check succeeds.");
+    });
+
+    return () => { cancelled = true; };
+  }, [open, user.id, user.role]);
 
   const fullName =
     [form.firstName, form.lastName].filter(Boolean).join(" ") || form.email;
@@ -131,7 +159,8 @@ function EditAccountForm({
           <select
             value={form.role}
             onChange={(e) => form.setRole(e.target.value)}
-            className={`${inputClass} mt-1.5`}
+            disabled={user.role === "TECHNICIAN" && (openAssignedJobs === null || openAssignedJobs > 0)}
+            className={`${inputClass} mt-1.5 disabled:cursor-not-allowed disabled:opacity-60`}
           >
             {ROLE_OPTIONS.map((r) => (
               <option key={r.value} value={r.value}>
@@ -139,6 +168,12 @@ function EditAccountForm({
               </option>
             ))}
           </select>
+          {user.role === "TECHNICIAN" && openAssignedJobs !== null && openAssignedJobs > 0 && (
+            <p className="mt-1.5 text-[10px] text-amber-700 dark:text-amber-300">
+              Role locked: {openAssignedJobs} open assigned {openAssignedJobs === 1 ? "repair" : "repairs"}. Reassign or close them first.
+            </p>
+          )}
+          {assignmentCheckError && <p className="mt-1.5 text-[10px] text-red-600 dark:text-red-400">{assignmentCheckError}</p>}
         </div>
         <div className="text-center">
           <label className={labelClass}>Joined at</label>

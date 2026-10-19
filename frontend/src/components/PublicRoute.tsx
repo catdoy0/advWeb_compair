@@ -13,7 +13,6 @@ export default function PublicRoute({ children }: { children: ReactNode }) {
 
   if (loading) return <LoadingScreen/>
 
-  if (!session) return <>{children}</>
-  else if (session.user.role) return <Navigate to={ROUTES.DASHBOARD.ROOT} replace />;
-  else return <>{children}</>
+  if (!session?.user?.role) return <>{children}</>
+  else return <Navigate to={ROUTES.DASHBOARD.ROOT} replace />;
 }

@@ -434,6 +434,18 @@ def get_user_state(user_id: int) -> tuple[str, bool] | None:
         return user.role.value, user.is_active
 
 
+def count_open_assigned_repairs(technician_id: int) -> int:
+    """Count assigned repairs that have not reached a terminal state."""
+    with Session(engine) as s:
+        return s.execute(text("""
+            SELECT COUNT(*)
+            FROM repairs r
+            JOIN repair_requests rr ON rr.id = r.repair_request_id
+            WHERE r.technician_id = :technician_id
+              AND rr.status NOT IN ('RELEASED', 'CANCELLED', 'REJECTED')
+        """), {"technician_id": technician_id}).scalar_one()
+
+
 def archive_user(user_id: int) -> bool:
     with Session(engine) as s:
         user = s.get(Users, user_id)

@@ -180,7 +180,22 @@ export async function session(): Promise<UserSession | null> {
 
     if (!res.ok) return null;
 
-    return await res.json();
+    const data: unknown = await res.json();
+    if (!data || typeof data !== "object" || !("user" in data)) return null;
+
+    const user = (data as { user?: unknown }).user;
+    if (!user || typeof user !== "object" || !("role" in user)) return null;
+
+    const role = (user as { role?: unknown }).role;
+    if (
+      role !== "CUSTOMER" &&
+      role !== "TECHNICIAN" &&
+      role !== "STAFF" &&
+      role !== "ADMIN" &&
+      role !== "SUPER_ADMIN"
+    ) return null;
+
+    return data as UserSession;
   } catch {
     return null;
   }

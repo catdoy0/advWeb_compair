@@ -8,9 +8,10 @@ from src.database import engine
 from src.models.appointments import Appointments
 from src.models.conversations import Conversations
 from src.models.devices import Devices
-from src.models.enums import AppointmentStatus, ComputerType, RepairRequestStatus
+from src.models.enums import AppointmentStatus, ComputerType, RepairRequestStatus, UserRole
 from src.models.repair_requests import Repair_Requests
 from src.models.repairs import Repairs
+from src.models.users import Users
 from src.sql import conversation as conv_sql
 
 WORKFLOW_ORDER = [
@@ -290,6 +291,8 @@ def list_repair_queue(status: str | None, search: str) -> list[dict]:
             rr.created_at,
             rr.status,
             rr.reported_problem,
+            rr.preferred_date,
+            rr.preferred_time,
             d.computer_name,
             u.id            AS customer_id,
             u.first_name,
@@ -349,6 +352,8 @@ def list_repair_queue(status: str | None, search: str) -> list[dict]:
             "created_at": row["created_at"],
             "status": row["status"],
             "reported_problem": row["reported_problem"],
+            "preferred_date": row["preferred_date"],
+            "preferred_time": row["preferred_time"],
             "computer_name": row["computer_name"],
             "customer_id": row["customer_id"],
             "customer_name": customer_name,
@@ -467,6 +472,55 @@ def _get_repair_detail(column: str, value: int | str) -> dict | None:
 
 def get_repair_detail(repair_request_id: int) -> dict | None:
     return _get_repair_detail("id", repair_request_id)
+
+
+def assign_repair_technician(repair_request_id: int, technician_id: int | None) -> str | None:
+    with Session(engine) as s:
+        req = s.get(Repair_Requests, repair_request_id)
+        if req is None:
+            return None
+        if technician_id is None:
+            if req.status.value not in ("PENDING", "RECEIVED", "DIAGNOSING", "REPAIRING", "COMPLETED"):
+                raise ValueError("Only open repair requests can be unassigned.")
+        elif req.status.value not in ("PENDING", "RECEIVED", "DIAGNOSING", "REPAIRING"):
+            raise ValueError("Only repair requests in progress can be assigned.")
+
+        if technician_id is not None:
+            technician = s.get(Users, technician_id)
+            if (
+                technician is None
+                or technician.role != UserRole.TECHNICIAN
+                or not technician.is_active
+                or technician.archived_at is not None
+            ):
+                raise ValueError("Select an active technician account.")
+
+        repair = s.exec(
+            select(Repairs).where(Repairs.repair_request_id == repair_request_id)
+        ).first()
+        if repair is None:
+            if technician_id is None:
+                raise ValueError("This repair request has no technician assigned.")
+            repair = Repairs(repair_request_id=repair_request_id)
+            s.add(repair)
+        repair.technician_id = technician_id
+        repair.updated_at = _now()
+        s.commit()
+        return req.status.value
+
+
+def unassign_open_repairs_for_technician(technician_id: int) -> int:
+    with Session(engine) as s:
+        result = s.execute(text("""
+            UPDATE repairs r
+            SET technician_id = NULL, updated_at = NOW()
+            FROM repair_requests rr
+            WHERE rr.id = r.repair_request_id
+              AND r.technician_id = :technician_id
+              AND rr.status NOT IN ('RELEASED', 'CANCELLED', 'REJECTED')
+        """), {"technician_id": technician_id})
+        s.commit()
+        return result.rowcount or 0
 
 
 def _ensure_repair_and_assign(

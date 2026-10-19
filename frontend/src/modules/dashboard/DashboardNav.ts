@@ -38,7 +38,7 @@ const partsInventoryItem = { label: "Parts Inventory", href: dashboardPath(D.PAR
 const posItem = { label: "POS", href: dashboardPath(D.POS), icon: ShoppingCart };
 const customersItem = { label: "Customers", href: dashboardPath(D.CUSTOMERS), icon: Users };
 const devicesItem = { label: "Devices", href: dashboardPath(D.DEVICES), icon: Monitor };
-const techniciansItem = { label: "TODO:Technicians", href: dashboardPath(D.TECHNICIANS), icon: UserCog };
+const techniciansItem = { label: "Technicians", href: dashboardPath(D.TECHNICIANS), icon: UserCog };
 const staffItem = { label: "TODO:Staff", href: dashboardPath(D.STAFF), icon: UsersRound };
 const reportsItem = { label: "TODO:Reports", href: dashboardPath(D.REPORTS), icon: BarChart3 };
 

@@ -246,6 +246,14 @@ def edit_user(
 
     target_role, target_is_active = state
 
+    if target_role == UserRole.TECHNICIAN.value and user.role != UserRole.TECHNICIAN.value:
+        assigned_jobs = admin_sql.count_open_assigned_repairs(user.id)
+        if assigned_jobs:
+            raise HTTPException(
+                status_code=400,
+                detail=f"This technician has {assigned_jobs} open assigned repair(s). Reassign or close them before changing the role.",
+            )
+
     if current_user_id == user.id and user.role != target_role:
         raise HTTPException(
             status_code=400,

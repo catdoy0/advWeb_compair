@@ -40,7 +40,7 @@ def list_parts(
     if low_stock_only:
         sql += " AND quantity <= reorder_threshold"
 
-    sql += " ORDER BY name ASC"
+    sql += " ORDER BY id DESC"
 
     with Session(engine) as s:
         rows = s.execute(text(sql), params).mappings().all()

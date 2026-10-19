@@ -110,7 +110,7 @@ export default function PartsInventory() {
             {p.name}
           </p>
           <p className="mt-0.5 text-[9px] text-slate-400">
-            SKU-{String(p.id).padStart(3, "0")}
+            PRT-{String(p.id).padStart(3, "0")}
             {p.supplier ? ` · ${p.supplier}` : ""}
           </p>
         </>

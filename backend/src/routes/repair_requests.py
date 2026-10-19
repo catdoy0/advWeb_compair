@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Body, HTTPException, Query, Request
 
 from src.models.enums import UserRole
 from src.schemas.repair_note import CreateNoteRequest
@@ -176,6 +176,35 @@ def get_workspace(request: Request):
     items = rr_sql.list_assigned_repairs(user.id)
 
     return {"summary": summary, "items": items}
+
+
+@router.patch("/{repair_request_id}/technician")
+def assign_repair_technician(
+    repair_request_id: int,
+    request: Request,
+    technician_id: int | None = Body(..., embed=True),
+):
+    user = _require_user(request)
+    if user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Only administrators can assign technicians.")
+
+    try:
+        status = rr_sql.assign_repair_technician(repair_request_id, technician_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if status is None:
+        raise HTTPException(status_code=404, detail="Repair request not found.")
+    return {"status": status, "technician_id": technician_id}
+
+
+@router.patch("/technicians/{technician_id}/unassign")
+def unassign_technician_repairs(technician_id: int, request: Request):
+    user = _require_user(request)
+    if user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Only administrators can unassign technicians.")
+
+    count = rr_sql.unassign_open_repairs_for_technician(technician_id)
+    return {"unassigned_count": count}
 
 
 @router.get("/overview")
