@@ -79,30 +79,80 @@ export default function Messages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [loadingConversations, setLoadingConversations] = useState(false);
+  const [conversationCount, setConversationCount] = useState(0);
+  const [unreadTotal, setUnreadTotal] = useState(0);
+  const [conversationRefreshTick, setConversationRefreshTick] = useState(0);
   const [sending, setSending] = useState(false);
 
+  const conversationListRef = useRef<HTMLDivElement | null>(null);
+  const conversationOffsetRef = useRef(0);
+  const conversationHasMoreRef = useRef(false);
+  const conversationLoadingRef = useRef(false);
+  const conversationGenerationRef = useRef(0);
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const [atBottom, setAtBottom] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadConversations = useCallback(async (
+    query: string,
+    append: boolean,
+    generation: number,
+  ) => {
+    if (conversationLoadingRef.current || generation !== conversationGenerationRef.current) return;
 
-    async function loadConversations() {
-      try {
-        const data = await listConversations();
-        if (cancelled) return;
-        setConversations(data);
-      } catch (error) {
-        console.error("Failed to load conversations", error);
-        if (!cancelled) setConversations([]);
+    conversationLoadingRef.current = true;
+    setLoadingConversations(true);
+    const offset = append ? conversationOffsetRef.current : 0;
+
+    try {
+      const page = await listConversations(query, offset);
+      if (generation !== conversationGenerationRef.current) return;
+
+      setConversations((current) => {
+        if (!append) return page.items;
+        const existingIds = new Set(current.map((conversation) => conversation.id));
+        return [...current, ...page.items.filter((conversation) => !existingIds.has(conversation.id))];
+      });
+      conversationOffsetRef.current = offset + page.items.length;
+      conversationHasMoreRef.current = page.has_more;
+      setConversationCount(page.total_count);
+      setUnreadTotal(page.unread_total);
+    } catch (error) {
+      console.error("Failed to load conversations", error);
+      if (generation === conversationGenerationRef.current && !append) {
+        setConversations([]);
+        setConversationCount(0);
+        setUnreadTotal(0);
+      }
+    } finally {
+      if (generation === conversationGenerationRef.current) {
+        conversationLoadingRef.current = false;
+        setLoadingConversations(false);
       }
     }
-
-    void loadConversations();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    (async () => {
+      const generation = conversationGenerationRef.current + 1;
+      conversationGenerationRef.current = generation;
+      conversationLoadingRef.current = false;
+      conversationOffsetRef.current = 0;
+      conversationHasMoreRef.current = true;
+      
+      // Yield to the event loop before setting state
+      await Promise.resolve(); 
+      setConversations([]);
+      
+      await loadConversations(debouncedSearch, false, generation);
+    })();
+  }, [debouncedSearch, conversationRefreshTick, loadConversations]);
 
   function isNearBottom(el: HTMLDivElement, threshold = 80): boolean {
     return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
@@ -140,8 +190,7 @@ export default function Messages() {
 
   const handlePoke = useCallback(
     async (conversationId: number) => {
-      const list = await listConversations();
-      setConversations(list);
+      setConversationRefreshTick((tick) => tick + 1);
 
       if (conversationId !== selectedId) return;
 
@@ -149,8 +198,6 @@ export default function Messages() {
       setMessages([...data].reverse());
       await markConversationRead(conversationId);
       window.dispatchEvent(new Event("conversations-read"));
-      const refreshedList = await listConversations();
-      setConversations(refreshedList);
     },
     [selectedId],
   );
@@ -170,30 +217,14 @@ export default function Messages() {
       setMessages((prev) => [...prev, msg]);
       setDraft("");
 
-      const list = await listConversations();
-      setConversations(list);
+      setConversationRefreshTick((tick) => tick + 1);
     } finally {
       setSending(false);
     }
   }
 
-  const filteredConversations = conversations.filter((conv) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-
-    const title = conversationTitle(conv, isCustomer).toLowerCase();
-    const subtitle = conversationSubtitle(conv, isCustomer).toLowerCase();
-    const preview = (conv.preview ?? "").toLowerCase();
-
-    return title.includes(q) || subtitle.includes(q) || preview.includes(q);
-  });
-
   const selectedConversation =
     conversations.find((c) => c.id === selectedId) ?? null;
-  const unreadTotal = conversations.reduce(
-    (total, conversation) => total + conversation.unread_count,
-    0,
-  );
 
   return (
     <DashboardPage className="max-h-[calc(100vh-5rem)]">
@@ -215,7 +246,7 @@ export default function Messages() {
                 <p className="mt-0.5 text-xs text-slate-400">
                   {unreadTotal > 0
                     ? `${unreadTotal} unread message${unreadTotal === 1 ? "" : "s"}`
-                    : `${conversations.length} conversation${conversations.length === 1 ? "" : "s"}`}
+                    : `${conversationCount} conversation${conversationCount === 1 ? "" : "s"}`}
                 </p>
               </div>
               {/* <span className="rounded bg-[#eef4ff] dark:bg-[#0b213d] px-2 py-0.5 text-xs font-semibold text-[#2870e8] dark:text-[#8ec5ff]"> */}
@@ -240,8 +271,26 @@ export default function Messages() {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {filteredConversations.map((conv) => {
+          <div
+            ref={conversationListRef}
+            onScroll={(event) => {
+              const element = event.currentTarget;
+              const nearBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 100;
+              if (
+                nearBottom &&
+                conversationHasMoreRef.current &&
+                !conversationLoadingRef.current
+              ) {
+                void loadConversations(
+                  debouncedSearch,
+                  true,
+                  conversationGenerationRef.current,
+                );
+              }
+            }}
+            className="min-h-0 flex-1 overflow-y-auto"
+          >
+            {conversations.map((conv) => {
               const isSelected = selectedId === conv.id;
               const title = conversationTitle(conv, isCustomer);
               const subtitle = conversationSubtitle(conv, isCustomer);
@@ -293,12 +342,24 @@ export default function Messages() {
               );
             })}
 
-            {filteredConversations.length === 0 && (
+            {loadingConversations && conversations.length === 0 && (
               <div className="px-4 py-8 text-center text-xs text-slate-400">
-                {conversations.length === 0
-                  ? "No conversations yet."
-                  : "Nothing matches your search."}
+                Loading conversations...
               </div>
+            )}
+
+            {!loadingConversations && conversations.length === 0 && (
+              <div className="px-4 py-8 text-center text-xs text-slate-400">
+                {debouncedSearch
+                  ? "No conversations match your search."
+                  : "No conversations yet."}
+              </div>
+            )}
+
+            {loadingConversations && conversations.length > 0 && (
+              <p className="px-4 py-3 text-center text-[10px] text-slate-400">
+                Loading more conversations...
+              </p>
             )}
           </div>
         </DashboardPanel>

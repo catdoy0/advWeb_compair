@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from operator import or_
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -58,11 +59,20 @@ def create_notifications(
 
 
 def list_for_user(user_id: int, limit: int = 30) -> list[Notifications]:
+    ten_days_ago = datetime.now(timezone.utc) - timedelta(days=10)
+
     with Session(engine) as s:
         return list(
             s.exec(
                 select(Notifications)
-                .where(Notifications.user_id == user_id)
+                .where(
+                    Notifications.user_id == user_id,
+                    or_(
+                        Notifications.is_read == False,
+                        
+                        (Notifications.is_read == True) & (Notifications.created_at >= ten_days_ago)
+                    )
+                )
                 .order_by(col(Notifications.created_at).desc())
                 .limit(limit)
             ).all()

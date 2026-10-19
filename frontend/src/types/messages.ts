@@ -11,6 +11,13 @@ export interface Conversation {
   unread_count: number;
 }
 
+export interface ConversationPage {
+  items: Conversation[];
+  has_more: boolean;
+  total_count: number;
+  unread_total: number;
+}
+
 export interface Message {
   id: number;
   conversation_id: number;

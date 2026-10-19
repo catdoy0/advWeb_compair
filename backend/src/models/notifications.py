@@ -23,6 +23,6 @@ class Notifications(SQLModel, table=True):
     # context — e.g. repair_request_id, appointment_id
     reference_id: int | None = Field(default=None)
 
-    is_read: bool = Field(default=False, index=True)
+    is_read: bool = Field(default=False)
     created_at: datetime = Field(default_factory=_now, index=True)
     read_at: datetime | None = None

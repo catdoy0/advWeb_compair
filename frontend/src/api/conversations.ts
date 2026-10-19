@@ -1,4 +1,4 @@
-import type { Conversation, Message } from "../types/messages";
+import type { ConversationPage, Message } from "../types/messages";
 import { apiFetch } from "./auth";
 
 const CHAT = "conversations";
@@ -11,9 +11,15 @@ const CHAT = "conversations";
 //   if (!res.ok) return [];
 //   return await res.json();
 // }
-export async function listConversations(): Promise<Conversation[]> {
-  const res = await apiFetch(`${CHAT}/`, { method: "GET" });
-  if (!res.ok) return [];
+export async function listConversations(
+  search = "",
+  offset = 0,
+): Promise<ConversationPage> {
+  const params = new URLSearchParams({ search, offset: String(offset), limit: "10" });
+  const res = await apiFetch(`${CHAT}/?${params}`, { method: "GET" });
+  if (!res.ok) {
+    return { items: [], has_more: false, total_count: 0, unread_total: 0 };
+  }
   return await res.json();
 }
 

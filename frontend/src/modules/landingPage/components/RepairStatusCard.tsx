@@ -145,23 +145,23 @@ export default function RepairStatusCard() {
 
         <div className="my-4 border-t border-[#e7edf5] dark:border-slate-700" />
 
-        <div className="flex items-center justify-between">
-          <span className="text-2xs text-[#7a8798] dark:text-slate-400">
-            Estimated cost
-          </span>
+        {/* <div className="flex items-center justify-between"> */}
+        {/*   <span className="text-2xs text-[#7a8798] dark:text-slate-400"> */}
+        {/*     Estimated cost */}
+        {/*   </span> */}
+        {/**/}
+        {/*   <span className="text-sm font-bold text-[#153f89] dark:text-blue-200"> */}
+        {/*     ₱1,450 */}
+        {/*   </span> */}
+        {/* </div> */}
 
-          <span className="text-sm font-bold text-[#153f89] dark:text-blue-200">
-            ₱1,450
-          </span>
-        </div>
-
-        <CommonButton
-          variant="outline"
-          className="mt-3 flex w-full items-center justify-center gap-2 py-2"
-        >
-          <MessageSquare size={13} />
-          Open repair chat
-        </CommonButton>
+        {/* <CommonButton */}
+        {/*   variant="outline" */}
+        {/*   className="mt-3 flex w-full items-center justify-center gap-2 py-2" */}
+        {/* > */}
+        {/*   <MessageSquare size={13} /> */}
+        {/*   Open repair chat */}
+        {/* </CommonButton> */}
       </CommonCard>
     </div>
   )

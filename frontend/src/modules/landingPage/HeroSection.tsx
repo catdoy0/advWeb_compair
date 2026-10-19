@@ -112,7 +112,7 @@ export default function HeroSection() {
           </div>
 
           {/* Right */}
-            <RepairStatusCard />
+          <RepairStatusCard />
         </div>
       </SectionContainer>
     </section>

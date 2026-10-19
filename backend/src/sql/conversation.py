@@ -195,6 +195,148 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
     return result_list
 
 
+def search_conversations_for_team(
+    user_id: int,
+    search: str,
+    limit: int,
+    offset: int,
+) -> dict:
+    """Return a page of team conversations, matching search in the database."""
+    with Session(engine) as s:
+        rows = s.execute(text("""
+            SELECT
+                c.id,
+                c.customer_id,
+                c.repair_request_id,
+                c.last_message_at,
+                u.first_name,
+                u.last_name,
+                u.email,
+                rr.repair_number,
+                d.computer_name,
+                m.content AS last_message,
+                unread.count AS unread_count,
+                COUNT(*) OVER() AS total_count,
+                SUM(unread.count) OVER() AS unread_total
+            FROM conversations c
+            JOIN users u ON u.id = c.customer_id
+            LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
+            LEFT JOIN devices d ON d.id = rr.device_id
+            LEFT JOIN LATERAL (
+                SELECT content
+                FROM messages
+                WHERE conversation_id = c.id
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+            ) m ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*) AS count
+                FROM messages unread_message
+                LEFT JOIN conversation_reads cr
+                    ON cr.conversation_id = c.id AND cr.user_id = :uid
+                WHERE unread_message.conversation_id = c.id
+                  AND unread_message.sender_id != :uid
+                  AND (cr.last_read_message_id IS NULL
+                       OR unread_message.id > cr.last_read_message_id)
+            ) unread ON TRUE
+            WHERE :search = ''
+               OR concat_ws(' ', u.first_name, u.last_name) ILIKE :pattern
+               OR u.email ILIKE :pattern
+               OR COALESCE(rr.repair_number, '') ILIKE :pattern
+               OR COALESCE(d.computer_name, '') ILIKE :pattern
+               OR COALESCE(m.content, '') ILIKE :pattern
+            ORDER BY c.last_message_at DESC, c.id DESC
+            LIMIT :fetch_limit OFFSET :offset
+        """), {
+            "uid": user_id,
+            "search": search.strip(),
+            "pattern": f"%{search.strip()}%",
+            "fetch_limit": limit + 1,
+            "offset": offset,
+        }).mappings().all()
+
+    return _conversation_page(rows, limit)
+
+
+def search_conversations_for_customer(
+    customer_id: int,
+    search: str,
+    limit: int,
+    offset: int,
+) -> dict:
+    """Return a page of a customer's conversations, matching search in the database."""
+    with Session(engine) as s:
+        rows = s.execute(text("""
+            SELECT
+                c.id,
+                c.customer_id,
+                c.repair_request_id,
+                c.last_message_at,
+                rr.repair_number,
+                d.computer_name,
+                m.content AS last_message,
+                unread.count AS unread_count,
+                COUNT(*) OVER() AS total_count,
+                SUM(unread.count) OVER() AS unread_total
+            FROM conversations c
+            LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
+            LEFT JOIN devices d ON d.id = rr.device_id
+            LEFT JOIN LATERAL (
+                SELECT content
+                FROM messages
+                WHERE conversation_id = c.id
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+            ) m ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*) AS count
+                FROM messages unread_message
+                LEFT JOIN conversation_reads cr
+                    ON cr.conversation_id = c.id AND cr.user_id = :cid
+                WHERE unread_message.conversation_id = c.id
+                  AND unread_message.sender_id != :cid
+                  AND (cr.last_read_message_id IS NULL
+                       OR unread_message.id > cr.last_read_message_id)
+            ) unread ON TRUE
+            WHERE c.customer_id = :cid
+              AND (
+                    :search = ''
+                    OR CASE WHEN c.repair_request_id IS NULL
+                            THEN 'Compair Team' ELSE COALESCE(rr.repair_number, '') END ILIKE :pattern
+                    OR COALESCE(rr.repair_number, '') ILIKE :pattern
+                    OR COALESCE(d.computer_name, '') ILIKE :pattern
+                    OR COALESCE(m.content, '') ILIKE :pattern
+              )
+            ORDER BY c.repair_request_id IS NULL DESC, c.last_message_at DESC, c.id DESC
+            LIMIT :fetch_limit OFFSET :offset
+        """), {
+            "cid": customer_id,
+            "search": search.strip(),
+            "pattern": f"%{search.strip()}%",
+            "fetch_limit": limit + 1,
+            "offset": offset,
+        }).mappings().all()
+
+    return _conversation_page(rows, limit)
+
+
+def _conversation_page(rows, limit: int) -> dict:
+    has_more = len(rows) > limit
+    items = []
+    for row in rows[:limit]:
+        item = dict(row)
+        item.pop("total_count", None)
+        item.pop("unread_total", None)
+        items.append(item)
+
+    return {
+        "items": items,
+        "has_more": has_more,
+        "total_count": rows[0]["total_count"] if rows else 0,
+        "unread_total": rows[0]["unread_total"] if rows else 0,
+    }
+
+
 def list_messages(
     conversation_id: int,
     limit: int = 30,

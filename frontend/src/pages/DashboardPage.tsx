@@ -11,7 +11,6 @@ import { useTitle } from "../hooks/useTitle";
 import { useLoading } from "../context/LoadingContext";
 import LoadingScreen from "../components/common/LoadingScreen";
 import { listConversations } from "../api/conversations";
-import type { Conversation } from "../types/messages";
 import { useEvents } from "../context/EventContext";
 
 export default function DashboardPage() {
@@ -33,13 +32,9 @@ export default function DashboardPage() {
 
     async function refreshUnreadMessages() {
       try {
-        const conversations: Conversation[] = await listConversations();
+        const page = await listConversations();
         if (cancelled) return;
-        const total = conversations.reduce(
-          (count, conversation) => count + conversation.unread_count,
-          0,
-        );
-        setUnreadMessages(total);
+        setUnreadMessages(page.unread_total);
       } catch (error) {
         console.error("Failed to load unread message count", error);
       }

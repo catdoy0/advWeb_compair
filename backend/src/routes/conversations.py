@@ -20,17 +20,26 @@ def _full_name(user) -> str:
 
 
 @router.get("/")
-def list_conversations(request: Request):
+def list_conversations(
+    request: Request,
+    search: str = Query(default="", max_length=200),
+    limit: int = Query(default=10, ge=1, le=10),
+    offset: int = Query(default=0, ge=0),
+):
     user = _require_user(request)
 
     if user.role == UserRole.CUSTOMER and user.id is not None:
         conv_sql.get_or_create_general_conversation(user.id)
-        rows = conv_sql.list_conversations_for_customer(user.id)
+        page = conv_sql.search_conversations_for_customer(
+            user.id, search, limit, offset,
+        )
     else:
-        rows = conv_sql.list_conversations_for_team(user.id) # type: ignore
+        page = conv_sql.search_conversations_for_team(
+            user.id, search, limit, offset,  # type: ignore[arg-type]
+        )
 
     result = []
-    for row in rows:
+    for row in page["items"]:
         result.append({
             "id": row["id"],
             "customer_id": row["customer_id"],
@@ -45,13 +54,18 @@ def list_conversations(request: Request):
         })
 
     if user.role != UserRole.CUSTOMER:
-        for i, row in enumerate(rows):
+        for i, row in enumerate(page["items"]):
             result[i]["customer_name"] = " ".join(
                 p for p in [row["first_name"], row["last_name"]] if p
             ).strip() or row["email"]
             result[i]["customer_email"] = row["email"]
 
-    return result
+    return {
+        "items": result,
+        "has_more": page["has_more"],
+        "total_count": page["total_count"],
+        "unread_total": page["unread_total"],
+    }
 
 
 @router.get("/{conversation_id}")
