@@ -33,8 +33,8 @@ from src.services.auth import (
     refresh_session,
     revoke_refresh_token,
     serialize_user,
-    signin_user,
     signin_google_user,
+    signin_user,
     signup_user,
 )
 from src.services.store_settings import read_settings, serialize_store_settings
@@ -193,7 +193,7 @@ def google_signin(data: GoogleSignInRequest, response: Response):
     if claims.get("email_verified") is not True:
         raise HTTPException(status_code=401, detail="Google email is not verified")
 
-    user, access_token, refresh_token = signin_google_user(claims)
+    user, access_token, refresh_token = signin_google_user(claims) # type: ignore
     _set_auth_cookies(response, access_token, refresh_token)
     return {
         "user": serialize_user(user),
