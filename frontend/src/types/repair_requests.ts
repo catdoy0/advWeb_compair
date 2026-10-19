@@ -65,6 +65,8 @@ export interface RepairQueueItem {
   created_at: string;
   status: RepairQueueStatus;
   reported_problem: string;
+  preferred_date?: string;
+  preferred_time?: string;
   computer_name: string;
   customer_id: number;
   customer_name: string;
@@ -76,6 +78,7 @@ export interface RepairQueueItem {
 export interface RepairQueueResponse {
   items: RepairQueueItem[];
   counts: Record<string, number>;
+  error?: string;
 }
 
 

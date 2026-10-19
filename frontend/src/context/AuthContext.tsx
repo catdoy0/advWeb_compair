@@ -57,7 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function refresh() {
     const data = await apiSession();
-    if (!data) return;
     setSession(data);
   }
 

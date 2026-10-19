@@ -71,8 +71,54 @@ export async function listRepairQueue(
     method: "GET",
   });
 
-  if (!res.ok) return { items: [], counts: {} };
+  if (!res.ok) {
+    let error = "Unable to load repair requests.";
+    try {
+      const data = await res.json();
+      if (data.detail) error = data.detail;
+    } catch { /* no response body */ }
+    return { items: [], counts: {}, error };
+  }
   return await res.json();
+}
+
+
+export async function assignRepairTechnician(
+  repairRequestId: number,
+  technicianId: number | null,
+): Promise<{ ok: boolean; message: string }> {
+  const res = await apiFetch(`repair-requests/${repairRequestId}/technician`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ technician_id: technicianId }),
+  });
+  if (!res.ok) {
+    let message = "Failed to update technician assignment.";
+    try {
+      const data = await res.json();
+      if (data.detail) message = data.detail;
+    } catch { /* no response body */ }
+    return { ok: false, message };
+  }
+  return { ok: true, message: technicianId === null ? "Technician unassigned." : "Technician assigned." };
+}
+
+
+export async function unassignTechnicianRepairs(
+  technicianId: number,
+): Promise<{ ok: boolean; message: string }> {
+  const res = await apiFetch(`repair-requests/technicians/${technicianId}/unassign`, {
+    method: "PATCH",
+  });
+  if (!res.ok) {
+    let message = "Failed to unassign technician repairs.";
+    try {
+      const data = await res.json();
+      if (data.detail) message = data.detail;
+    } catch { /* no response body */ }
+    return { ok: false, message };
+  }
+  return { ok: true, message: "Technician repairs unassigned." };
 }
 
 

@@ -243,10 +243,10 @@ def check_session(response: Response, request: Request):
                 return {
                     "user": serialize_user(user),
                     "store_settings": serialize_store_settings(store_settings)
-                        }
-            else: return {
-                    "store_settings": serialize_store_settings(store_settings)
-                        }
+                }
+            # The account role or active state may have changed since this access
+            # token was issued. Fall through to the refresh-token check below so
+            # an eligible account receives a fresh token with its current role.
         except (PyJWTError, KeyError, TypeError, ValueError):
             pass
 
