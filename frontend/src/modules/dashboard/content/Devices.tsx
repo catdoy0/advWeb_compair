@@ -60,6 +60,7 @@ function formatMoney(value: number | null): string {
 export default function Devices() {
   const [devices, setDevices] = useState<TeamDevice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [selectedRepairId, setSelectedRepairId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
@@ -78,7 +79,7 @@ export default function Devices() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshTick]);
 
   // filter + search (client-side)
   const filtered = useMemo(() => {
@@ -285,6 +286,8 @@ export default function Devices() {
           <DataTable
             columns={columns}
             data={pageItems}
+            onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            refreshing={loading}
             emptyMessage="No computers match your filters."
           />
         )}

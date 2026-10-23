@@ -75,12 +75,14 @@ export default function ActivityLogs() {
       key: "time",
       label: "Date and time",
       className: "w-[17%] whitespace-nowrap",
+      sortValue: (row) => row.created_at,
       render: (row) => <span className="text-[10px] text-slate-500 dark:text-slate-400">{formatDate(row.created_at)}</span>,
     },
     {
       key: "actor",
       label: "User",
       className: "w-[19%]",
+      sortValue: (row) => row.actor_name,
       render: (row) => (
         <>
           <p className="text-[11px] font-bold text-[#102c50] dark:text-white">{row.actor_name}</p>
@@ -131,6 +133,7 @@ export default function ActivityLogs() {
       key: "target",
       label: "Record",
       className: "w-[12%]",
+      sortValue: (row) => `${row.target_type ?? ""} ${row.target_id ?? ""}`,
       render: (row) => row.target_type ? (
         <span className="text-[10px] text-slate-500 dark:text-slate-400">
           <span className="capitalize">{row.target_type.replaceAll("_", " ")}</span>
@@ -184,7 +187,13 @@ export default function ActivityLogs() {
         ) : loading ? (
           <p className="px-5 py-10 text-center text-[11px] text-slate-400">Loading activity...</p>
         ) : (
-          <DataTable columns={columns} data={rows} emptyMessage="No matching activity found." />
+          <DataTable
+            columns={columns}
+            data={rows}
+            onRefresh={() => setRefreshTick((value) => value + 1)}
+            refreshing={loading}
+            emptyMessage="No matching activity found."
+          />
         )}
 
         <div className="flex items-center justify-between border-t border-[#e5ebf2] px-5 py-3 dark:border-slate-700">

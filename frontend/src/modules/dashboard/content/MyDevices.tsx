@@ -63,6 +63,7 @@ export default function MyDevices() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [devices, setDevices] = useState<CustomerDevice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [selectedRepairId, setSelectedRepairId] = useState<number | null>(null);
   const [receiptNoticeOpen, setReceiptNoticeOpen] = useState(false);
   const [receiptNotice, setReceiptNotice] = useState("");
@@ -117,7 +118,7 @@ export default function MyDevices() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshTick]);
 
   // filter + search (client-side)
   const filtered = useMemo(() => {
@@ -325,6 +326,8 @@ export default function MyDevices() {
           <DataTable
             columns={columns}
             data={pageItems}
+            onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            refreshing={loading}
             emptyMessage="No computers match your filters."
           />
         )}

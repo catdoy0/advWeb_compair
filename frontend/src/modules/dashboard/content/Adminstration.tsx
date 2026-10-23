@@ -27,6 +27,7 @@ const accountColumns = (
       key: "account",
       label: "Account",
       className: "w-[25%]",
+      sortValue: (account) => account.name,
       render: (account) => {
         const raw = account.raw;
         const initials =
@@ -64,7 +65,7 @@ account.status === "Active"
         </span>
       ),
     },
-    { key: "lastSignIn", label: "Last sign in" },
+    { key: "lastSignIn", label: "Last sign in", sortValue: (account) => account.lastSignIn },
     {
       key: "actions",
     label: "Actions",
@@ -219,6 +220,8 @@ export default function Adminstration() {
           <DataTable
             columns={columns}
             data={admin.accounts}
+            onRefresh={admin.reload}
+            refreshing={admin.loading}
             emptyMessage="No accounts found for this role."
           />
         )}

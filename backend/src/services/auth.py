@@ -1,5 +1,5 @@
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
@@ -29,6 +29,11 @@ def serialize_user(user: Users) -> dict:
         "role": user.role.value,
         "avatarUrl": user.avatar_url,
         "avatar_url": user.avatar_url,
+        "nameChangeAvailableAt": (
+            (_utc(user.name_updated_at) + timedelta(days=7)).isoformat()
+            if user.name_updated_at is not None
+            else None
+        ),
     }
 
 

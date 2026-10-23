@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, Check, LogOut } from "lucide-react";
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
@@ -11,7 +11,7 @@ import { dummySession } from "../../../dummyData";
 import DashboardPage from "../components/DashboardPage";
 import DashboardPanel from "../components/DashboardPanel";
 import UserAvatar from "../../../components/common/widgets/UserAvatar";
-import { changeEmail, changePassword, uploadAvatar } from "../../../api/profile";
+import { changeEmail, changeName, changePassword, uploadAvatar } from "../../../api/profile";
 
 const PASSWORD_MIN = 8;
 
@@ -45,6 +45,18 @@ export default function Profile() {
   const fullName = hasName
     ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
     : user.email;
+  const nameChangeAvailableAt = user.nameChangeAvailableAt ? new Date(user.nameChangeAvailableAt) : null;
+  const [profileClock, setProfileClock] = useState(() => Date.now());
+  const nameCooldownActive = Boolean(nameChangeAvailableAt && nameChangeAvailableAt.getTime() > profileClock);
+
+  useEffect(() => {
+    if (!nameChangeAvailableAt) return;
+    const timeout = window.setTimeout(
+      () => setProfileClock(Date.now()),
+      Math.max(0, nameChangeAvailableAt.getTime() - Date.now() + 1),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [user.nameChangeAvailableAt]);
   const initials = (
     hasName
       ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`
@@ -54,6 +66,9 @@ export default function Profile() {
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [savingAvatar, setSavingAvatar] = useState(false);
+  const [firstName, setFirstName] = useState(user.firstName ?? "");
+  const [lastName, setLastName] = useState(user.lastName ?? "");
+  const [savingName, setSavingName] = useState(false);
 
   // message modal
   const [messageModalOpen, setMessageModalOpen] = useState(false);
@@ -100,6 +115,26 @@ export default function Profile() {
     } finally {
       setSavingAvatar(false);
       if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  }
+
+  async function handleSaveName() {
+    if (!firstName.trim()) {
+      setMessageModalMessage("First name is required.");
+      setMessageModalOpen(true);
+      return;
+    }
+    setSavingName(true);
+    try {
+      const result = await changeName({ firstName: firstName.trim(), lastName: lastName.trim() });
+      setMessageModalMessage(result.message);
+      setMessageModalOpen(true);
+      if (result.ok) await refresh();
+    } catch {
+      setMessageModalMessage("Could not update your name. Try again.");
+      setMessageModalOpen(true);
+    } finally {
+      setSavingName(false);
     }
   }
 
@@ -239,20 +274,42 @@ export default function Profile() {
               </div>
             </div>
 
-            <dl className="grid grid-cols-2 gap-4 border-b border-[#e6ebf2] py-4 dark:border-slate-700">
-              <div>
-                <dt className="text-[9px] text-slate-400">Last name</dt>
-                <dd className="mt-1 text-[11px] font-bold text-[#102c50] dark:text-white">
-                  {user.lastName}
-                </dd>
+            <div className="grid gap-4 border-b border-[#e6ebf2] py-4 sm:grid-cols-2 dark:border-slate-700">
+              <CommonInput
+                id="profile-first-name"
+                label="First name"
+                value={firstName}
+                maxLength={72}
+                disabled={nameCooldownActive || savingName}
+                onChange={(event) => setFirstName(event.target.value)}
+                variant="dashboard"
+              />
+              <CommonInput
+                id="profile-last-name"
+                label="Last name"
+                value={lastName}
+                maxLength={72}
+                disabled={nameCooldownActive || savingName}
+                onChange={(event) => setLastName(event.target.value)}
+                variant="dashboard"
+              />
+              <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
+                <p className="text-[10px] text-slate-400">
+                  {nameCooldownActive && nameChangeAvailableAt
+                    ? `You can change your name again ${nameChangeAvailableAt.toLocaleString()}.`
+                    : "Your name can be changed once every seven days."}
+                </p>
+                <CommonButton
+                  variant="outline"
+                  onClick={handleSaveName}
+                  disabled={savingName || nameCooldownActive}
+                  className="flex items-center gap-2 border-[#d4ddea] px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {savingName ? "Saving..." : "Save name"}
+                  {!savingName && <Check size={14} />}
+                </CommonButton>
               </div>
-              <div>
-                <dt className="text-[9px] text-slate-400">First name</dt>
-                <dd className="mt-1 text-[11px] font-bold text-[#102c50] dark:text-white">
-                  {user.firstName}
-                </dd>
-              </div>
-            </dl>
+            </div>
 
             <div className="grid gap-4 py-4 sm:grid-cols-2">
               <div>

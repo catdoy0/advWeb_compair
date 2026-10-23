@@ -116,6 +116,7 @@ export default function ArchivePage() {
       key: "customer",
       label: "Customer",
       className: "w-[24%]",
+      sortValue: (row) => [row.first_name, row.last_name].filter(Boolean).join(" ") || row.email,
       render: (row) => (
         <>
           <p className="text-[11px] font-bold text-[#102c50] dark:text-white">
@@ -129,6 +130,7 @@ export default function ArchivePage() {
       key: "context",
       label: "Conversation",
       className: "w-[23%]",
+      sortValue: (row) => `${row.repair_number ?? ""} ${row.repair_status}`,
       render: (row) => (
         <>
           <p className="font-mono text-[11px] font-semibold">{row.repair_number}</p>
@@ -140,6 +142,7 @@ export default function ArchivePage() {
       key: "preview",
       label: "Last message",
       className: "w-[29%]",
+      sortValue: (row) => row.preview,
       render: (row) => <span className="line-clamp-2 text-[10px] text-slate-500 dark:text-slate-400">{row.preview || "No messages"}</span>,
     },
     { key: "archived_at", label: "Archived", className: "w-[12%]", render: (row) => formatDate(row.archived_at) },
@@ -166,6 +169,7 @@ export default function ArchivePage() {
       key: "account",
       label: "Account",
       className: "w-[35%]",
+      sortValue: (row) => [row.first_name, row.last_name].filter(Boolean).join(" ") || row.email,
       render: (row) => (
         <>
           <p className="text-[11px] font-bold text-[#102c50] dark:text-white">
@@ -180,6 +184,7 @@ export default function ArchivePage() {
       key: "status",
       label: "Access",
       className: "w-[14%]",
+      sortValue: (row) => row.is_active ? "Active" : "Suspended",
       render: (row) => <span className="text-[10px] text-slate-500 dark:text-slate-400">{row.is_active ? "Active" : "Suspended"}</span>,
     },
     { key: "archived_at", label: "Archived", className: "w-[16%]", render: (row) => formatDate(row.archived_at) },
@@ -277,9 +282,21 @@ export default function ArchivePage() {
         {loading ? (
           <p className="px-5 py-10 text-center text-[11px] text-slate-400">Loading archive...</p>
         ) : activeTab === "messages" ? (
-          <DataTable columns={messageColumns} data={messages} emptyMessage="No archived conversations found." />
+          <DataTable
+            columns={messageColumns}
+            data={messages}
+            onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            refreshing={loading}
+            emptyMessage="No archived conversations found."
+          />
         ) : (
-          <DataTable columns={accountColumns} data={accounts} emptyMessage="No archived accounts found." />
+          <DataTable
+            columns={accountColumns}
+            data={accounts}
+            onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            refreshing={loading}
+            emptyMessage="No archived accounts found."
+          />
         )}
 
         {!loading && total > 0 && (

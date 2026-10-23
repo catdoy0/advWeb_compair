@@ -25,4 +25,5 @@ class Users(SQLModel, table=True):
     archived_at: datetime | None = Field(default=None, index=True)
 
     updated_at: datetime | None = None
+    name_updated_at: datetime | None = None
     last_sign_in: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

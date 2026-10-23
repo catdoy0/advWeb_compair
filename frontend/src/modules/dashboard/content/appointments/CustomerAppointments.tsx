@@ -190,6 +190,7 @@ export default function CustomerAppointments() {
       key: "repair_detail",
       label: "",
       className: "w-[16%]",
+      sortable: false,
       render: (a) => (
         <Link
           to={`/dashboard/mydevices?id=${a.repair_request_id}`}
@@ -314,6 +315,8 @@ export default function CustomerAppointments() {
             <DataTable
               columns={columns}
               data={appointments}
+              onRefresh={() => setRefreshTick((tick) => tick + 1)}
+              refreshing={loading}
               emptyMessage="No appointments scheduled for this day."
             />
           )}

@@ -4,7 +4,7 @@ from urllib.parse import quote, unquote, urlparse
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, HTTPException, Request, Response
 
-from src.schemas.profile import ChangeEmail, ChangePassword
+from src.schemas.profile import ChangeEmail, ChangeName, ChangePassword
 from src.services.auth import get_current_user_id
 from src.services.activity_log import record_activity
 from src.sql import profile as profile_sql
@@ -112,6 +112,35 @@ def change_email(
     )
 
     return {"success": True, "message": message["message"]}
+
+
+@router.post("/change-name")
+def change_name(request: Request, body: ChangeName):
+    user_id = get_current_user_id(request)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    result = profile_sql.change_name(user_id, body)
+    if not result["success"]:
+        raise HTTPException(
+            status_code=result.get("status_code", 400),
+            detail=result["message"],
+        )
+
+    if result.get("changed"):
+        record_activity(
+            user_id,
+            "PROFILE_NAME_CHANGED",
+            "Updated their first and last name.",
+            target_type="account",
+            target_id=user_id,
+        )
+
+    return {
+        "success": True,
+        "message": result["message"],
+        "nameChangeAvailableAt": result["available_at"],
+    }
 
 
 @router.post("/change-password")

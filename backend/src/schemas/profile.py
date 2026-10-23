@@ -1,4 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class ChangeName(BaseModel):
+    firstName: str = Field(max_length=72)
+    lastName: str = Field(max_length=72)
 
 
 class ChangeEmail(BaseModel):

@@ -137,6 +137,7 @@ export default function DatabaseBackups({ onSnapshotCountChange }: { onSnapshotC
       key: "snapshot",
       label: "Snapshot",
       className: "w-[30%]",
+      sortValue: (snapshot) => snapshot.label,
       render: (snapshot) => (
         <>
           <p className="text-[11px] font-bold text-[#102c50] dark:text-white">{snapshot.label}</p>
@@ -165,12 +166,14 @@ export default function DatabaseBackups({ onSnapshotCountChange }: { onSnapshotC
       key: "size",
       label: "Size",
       className: "w-[10%]",
+      sortValue: (snapshot) => snapshot.size_bytes,
       render: (snapshot) => <span className="text-[10px] text-slate-500 dark:text-slate-400">{formatSize(snapshot.size_bytes)}</span>,
     },
     {
       key: "created_by",
       label: "Created by",
       className: "w-[12%]",
+      sortValue: (snapshot) => snapshot.created_by?.name,
       render: (snapshot) => <span className="text-[10px] text-slate-500 dark:text-slate-400">{snapshot.created_by?.name ?? "System"}</span>,
     },
     {
@@ -268,6 +271,8 @@ export default function DatabaseBackups({ onSnapshotCountChange }: { onSnapshotC
           <DataTable
             columns={columns}
             data={visibleSnapshots}
+            onRefresh={() => setReload((value) => value + 1)}
+            refreshing={loading}
             emptyMessage={showArchived ? "No archived snapshots." : "No active snapshots yet. Create one before making major changes."}
           />
         )}

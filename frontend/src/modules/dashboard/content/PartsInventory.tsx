@@ -167,6 +167,7 @@ export default function PartsInventory() {
       key: "status",
       label: "Status",
       className: "w-[11%]",
+      sortValue: (part) => part.is_low_stock ? "Low stock" : "In stock",
       render: (p) => (
         <span
           className={`inline-flex rounded px-2 py-1 text-[9px] font-bold ${
@@ -346,6 +347,8 @@ export default function PartsInventory() {
           <DataTable
             columns={columns}
             data={parts}
+            onRefresh={refresh}
+            refreshing={loading}
             emptyMessage="No parts match this filter."
           />
         )}

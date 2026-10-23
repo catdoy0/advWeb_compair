@@ -304,6 +304,8 @@ export default function RepairQueue() {
           <DataTable
             columns={columns}
             data={items}
+            onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            refreshing={loading}
             emptyMessage="No requests match this filter."
           />
         )}

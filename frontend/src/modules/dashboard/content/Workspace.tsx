@@ -278,6 +278,8 @@ export default function Workspace() {
           <DataTable
             columns={columns}
             data={items}
+            onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            refreshing={loading}
             emptyMessage="No devices assigned to you."
           />
         )}

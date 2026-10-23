@@ -14,6 +14,7 @@ export interface UserSession {
     role: Role;
     avatarUrl?: string | null;
     avatar_url?: string | null;
+    nameChangeAvailableAt?: string | null;
   };
 }
 
