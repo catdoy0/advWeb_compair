@@ -7,6 +7,7 @@ export interface GetUser {
   created_at?: string;
   is_active: boolean;
   last_sign_in?: string;
+  avatar_url?: string | null;
 }
 
 export interface TotalUsers {

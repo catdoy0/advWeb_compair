@@ -434,6 +434,18 @@ def get_user_state(user_id: int) -> tuple[str, bool] | None:
         return user.role.value, user.is_active
 
 
+def get_user_identity(user_id: int) -> dict | None:
+    with Session(engine) as s:
+        user = s.get(Users, user_id)
+        if user is None:
+            return None
+        return {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+        }
+
+
 def count_open_assigned_repairs(technician_id: int) -> int:
     """Count assigned repairs that have not reached a terminal state."""
     with Session(engine) as s:

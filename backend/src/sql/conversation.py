@@ -20,7 +20,7 @@ def get_general_conversation(customer_id: int) -> Conversations | None:
             select(Conversations)
             .where(Conversations.customer_id == customer_id)
             .where(Conversations.repair_request_id == None)
-            .where(Conversations.archived_at.is_(None))
+            .where(Conversations.archived_at.is_(None)) # type: ignore
         ).first()
 
 
@@ -104,7 +104,7 @@ def list_conversations_for_team(user_id: int) -> list[dict]:
                 SELECT content
                 FROM messages
                 WHERE conversation_id = c.id
-                ORDER BY created_at DESC
+                ORDER BY last_message_at DESC, id DESC
                 LIMIT 1
             ) m ON TRUE
             LEFT JOIN LATERAL (
@@ -138,6 +138,7 @@ def list_conversations_for_team(user_id: int) -> list[dict]:
             "last_name": row["last_name"],
             "email": row["email"],
             "repair_number": row["repair_number"],
+            "repair_status": row["repair_status"],
             "computer_name": row["computer_name"],
             "last_message": row["last_message"],
             "unread_count": row["unread_count"],
@@ -156,6 +157,7 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
                 c.repair_request_id,
                 c.last_message_at,
                 rr.repair_number,
+                rr.status AS repair_status,
                 d.computer_name,
                 m.content AS last_message,
                 unread.count AS unread_count
@@ -191,12 +193,24 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
             "repair_request_id": row["repair_request_id"],
             "last_message_at": row["last_message_at"],
             "repair_number": row["repair_number"],
+            "repair_status": row["repair_status"],
             "computer_name": row["computer_name"],
             "last_message": row["last_message"],
             "unread_count": row["unread_count"],
         })
 
     return result_list
+
+
+def get_conversation_repair_status(conversation_id: int) -> str | None:
+    """Return the current repair status for a conversation, if it has a repair."""
+    with Session(engine) as s:
+        return s.execute(text("""
+            SELECT rr.status
+            FROM conversations c
+            LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
+            WHERE c.id = :cid
+        """), {"cid": conversation_id}).scalar_one_or_none()
 
 
 def search_conversations_for_team(
@@ -295,7 +309,7 @@ def search_conversations_for_customer(
                 SELECT content
                 FROM messages
                 WHERE conversation_id = c.id
-                ORDER BY created_at DESC, id DESC
+                ORDER BY last_message_at DESC, id DESC
                 LIMIT 1
             ) m ON TRUE
             LEFT JOIN LATERAL (
@@ -468,7 +482,7 @@ def archive_conversation(conversation_id: int) -> bool:
               )
         """), {"id": conversation_id, "now": _now()})
         s.commit()
-        return result.rowcount > 0
+        return result.rowcount > 0 # type: ignore
 
 
 def can_archive_conversation(conversation_id: int) -> bool | None:
@@ -496,7 +510,7 @@ def restore_conversation(conversation_id: int) -> bool:
             WHERE id = :id AND archived_at IS NOT NULL
         """), {"id": conversation_id})
         s.commit()
-        return result.rowcount > 0
+        return result.rowcount > 0 # type: ignore
 
 
 def list_archived_conversations(search: str, limit: int, offset: int) -> dict:

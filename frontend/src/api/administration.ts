@@ -9,6 +9,35 @@ import { apiFetch } from "./auth";
 
 const ADMINISTRATION = "administration"
 
+export interface ActivityLogEntry {
+  id: number;
+  actor_id: number | null;
+  actor_name: string;
+  actor_email: string | null;
+  actor_role: string | null;
+  action: string;
+  description: string;
+  target_type: string | null;
+  target_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+}
+
+export async function getActivityLogs(
+  search: string,
+  page: number,
+  pageSize = 20,
+): Promise<ArchivePage<ActivityLogEntry> | null> {
+  const params = new URLSearchParams({ search, page: String(page), page_size: String(pageSize) });
+  try {
+    const res = await apiFetch(`${ADMINISTRATION}/activity-logs?${params}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function getAdminOverview(onDate: string): Promise<AdminOverviewData | null> {
   try {
     const res = await apiFetch(`${ADMINISTRATION}/overview?on_date=${encodeURIComponent(onDate)}`);

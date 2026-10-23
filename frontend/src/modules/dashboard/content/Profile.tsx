@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, LogOut } from "lucide-react";
+import { useRef, useState } from "react";
+import { Camera, Check, LogOut } from "lucide-react";
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
 import CommonInput from "../../../components/common/widgets/CommonInput";
@@ -10,7 +10,8 @@ import { useAuth } from "../../../context/AuthContext";
 import { dummySession } from "../../../dummyData";
 import DashboardPage from "../components/DashboardPage";
 import DashboardPanel from "../components/DashboardPanel";
-import { changeEmail, changePassword } from "../../../api/profile";
+import UserAvatar from "../../../components/common/widgets/UserAvatar";
+import { changeEmail, changePassword, uploadAvatar } from "../../../api/profile";
 
 const PASSWORD_MIN = 8;
 
@@ -51,6 +52,8 @@ export default function Profile() {
   ).toUpperCase();
 
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [savingAvatar, setSavingAvatar] = useState(false);
 
   // message modal
   const [messageModalOpen, setMessageModalOpen] = useState(false);
@@ -71,6 +74,34 @@ export default function Profile() {
   const [newPasswordError, setNewPasswordError] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+
+  async function handleAvatarSelected(file: File | undefined) {
+    if (!file) return;
+    if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(file.type)) {
+      setMessageModalMessage("Choose a JPEG, PNG, or WebP image.");
+      setMessageModalOpen(true);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMessageModalMessage("Image must be 5 MB or smaller.");
+      setMessageModalOpen(true);
+      return;
+    }
+
+    setSavingAvatar(true);
+    try {
+      const result = await uploadAvatar(file);
+      setMessageModalMessage(result.message);
+      setMessageModalOpen(true);
+      if (result.ok) await refresh();
+    } catch {
+      setMessageModalMessage("Could not upload profile picture. Try again.");
+      setMessageModalOpen(true);
+    } finally {
+      setSavingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  }
 
   async function handleSaveEmail() {
     const nextEmailError = validateEmail(email);
@@ -181,12 +212,31 @@ export default function Profile() {
         >
           <div className="p-5">
             <div className="flex items-center gap-3 border-b border-[#e6ebf2] pb-5 dark:border-slate-700">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#2870e8] text-[13px] font-bold text-white">
-                {initials}
+              <UserAvatar initials={initials} avatarUrl={user.avatarUrl} size={56} className="text-base" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[18px] font-bold text-[#102c50] dark:text-white">
+                  {fullName}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(event) => void handleAvatarSelected(event.target.files?.[0])}
+                  />
+                  <CommonButton
+                    variant="outline"
+                    disabled={savingAvatar}
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px]"
+                  >
+                    <Camera size={12} />
+                    {savingAvatar ? "Saving..." : "Change picture"}
+                  </CommonButton>
+                </div>
+                <p className="mt-1 text-[9px] text-slate-400">Upload a picture to replace your current saved profile picture.</p>
               </div>
-              <p className="text-[18px] font-bold text-[#102c50] dark:text-white">
-                {fullName}
-              </p>
             </div>
 
             <dl className="grid grid-cols-2 gap-4 border-b border-[#e6ebf2] py-4 dark:border-slate-700">

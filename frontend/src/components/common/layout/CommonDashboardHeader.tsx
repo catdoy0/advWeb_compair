@@ -8,6 +8,7 @@ interface CommonDashboardHeaderProps {
   breadcrumbs: string[]
   statusLabel?: string
   userInitials?: string
+  avatarUrl?: string | null
   onMenuClick: () => void;
 }
 
@@ -15,6 +16,7 @@ export default function CommonDashboardHeader({
   breadcrumbs,
   statusLabel,
   userInitials,
+  avatarUrl,
   onMenuClick
 }: CommonDashboardHeaderProps) {
   return (
@@ -60,7 +62,7 @@ export default function CommonDashboardHeader({
 
         <DarkModeButton />
         <NotificationBell />
-        <UserAvatar initials={userInitials || ""} />
+        <UserAvatar initials={userInitials || ""} avatarUrl={avatarUrl} />
       </div>
     </header>
   )

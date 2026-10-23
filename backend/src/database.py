@@ -55,6 +55,35 @@ def ensure_archive_columns() -> None:
         """)
 
 
+def ensure_activity_log_table() -> None:
+    """Create the append-only audit log table when upgrading existing databases."""
+    with engine.begin() as conn:
+        conn.exec_driver_sql("""
+            CREATE TABLE IF NOT EXISTS activity_logs (
+                id BIGSERIAL PRIMARY KEY,
+                actor_id INTEGER NULL,
+                actor_name VARCHAR(200) NOT NULL DEFAULT 'Unknown user',
+                actor_email VARCHAR(255) NULL,
+                actor_role VARCHAR(40) NULL,
+                action VARCHAR(80) NOT NULL,
+                description TEXT NOT NULL,
+                target_type VARCHAR(80) NULL,
+                target_id VARCHAR(120) NULL,
+                details JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        conn.exec_driver_sql(
+            "ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS actor_role VARCHAR(40)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_activity_logs_created_at ON activity_logs (created_at DESC, id DESC)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_activity_logs_actor_id ON activity_logs (actor_id)"
+        )
+
+
 DEFAULT_ROOT_EMAIL = "compair@gmail.com"
 DEFAULT_ROOT_PASSWORD = "root"
 

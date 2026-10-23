@@ -70,3 +70,15 @@ def change_password(user_id: int, changePassword: ChangePassword):
     except SQLAlchemyError as e:
         print(f"change_password failed: {e}")
         return {"success": False, "message": "An error occurred while updating password"}
+
+
+def set_avatar_url(user_id: int, avatar_url: str) -> bool:
+    with Session(engine) as s:
+        user = s.get(Users, user_id)
+        if user is None:
+            return False
+        user.avatar_url = avatar_url
+        user.updated_at = datetime.now(timezone.utc)
+        s.add(user)
+        s.commit()
+        return True

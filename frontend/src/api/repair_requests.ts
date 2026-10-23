@@ -301,6 +301,18 @@ export interface POSRecentRepair {
   status: string;
 }
 
+export interface POSRepairSearchResult extends POSRecentRepair {
+  computer_name: string;
+  customer_name: string;
+}
+
+export interface POSRepairSearchPage {
+  items: POSRepairSearchResult[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 export async function getRepairByNumber(
   repairNumber: string,
 ): Promise<RepairDetail | null> {
@@ -318,9 +330,26 @@ export async function listPosRecent(): Promise<POSRecentRepair[]> {
   return await res.json();
 }
 
+export async function searchPosRepairs(
+  search: string,
+  page: number,
+  pageSize: number,
+): Promise<POSRepairSearchPage> {
+  const params = new URLSearchParams({
+    search,
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  const res = await apiFetch(`repair-requests/pos-search?${params}`, { method: "GET" });
+  if (!res.ok) {
+    throw new Error("Unable to search repairs.");
+  }
+  return await res.json();
+}
+
 export async function checkoutRepair(
   id: number,
-): Promise<{ ok: boolean; message: string }> {
+): Promise<{ ok: boolean; message: string; receipt: Blob | null }> {
   const res = await apiFetch(`repair-requests/${id}/checkout`, {
     method: "POST",
   });
@@ -333,8 +362,32 @@ export async function checkoutRepair(
     } catch {
       /* no body */
     }
-    return { ok: false, message };
+    return { ok: false, message, receipt: null };
   }
 
-  return { ok: true, message: "Repair released." };
+  const receipt = await getRepairReceipt(id, true);
+  return {
+    ok: true,
+    message: receipt
+      ? "Repair released. Receipt downloaded."
+      : "Repair released, but the receipt could not be downloaded. It is available in My Devices.",
+    receipt,
+  };
+}
+
+export async function getRepairReceipt(
+  repairRequestId: number,
+  download = false,
+): Promise<Blob | null> {
+  try {
+    const query = download ? "?download=true" : "";
+    const res = await apiFetch(
+      `repair-requests/${repairRequestId}/receipt${query}`,
+      { method: "GET" },
+    );
+    if (!res.ok) return null;
+    return await res.blob();
+  } catch {
+    return null;
+  }
 }

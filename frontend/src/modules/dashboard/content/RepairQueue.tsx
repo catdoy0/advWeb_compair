@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import {  ChevronRight, Search } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -67,6 +68,7 @@ function formatEstimate(value: number | null): string {
 // ---------- page ----------
 
 export default function RepairQueue() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<RepairQueueItem[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [activeStatus, setActiveStatus] = useState<string>("");
@@ -74,6 +76,18 @@ export default function RepairQueue() {
   const [loading, setLoading] = useState(true);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const id = Number(searchParams.get("id"));
+    setSelectedId(Number.isInteger(id) && id > 0 ? id : null);
+  }, [searchParams]);
+
+  function closeDetails() {
+    setSelectedId(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete("id");
+    setSearchParams(next, { replace: true });
+  }
 
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -208,7 +222,7 @@ export default function RepairQueue() {
 
       <RepairDetailModal
         open={selectedId !== null}
-        onClose={() => setSelectedId(null)}
+        onClose={closeDetails}
         repairRequestId={selectedId}
         onUpdated={() => setRefreshTick((t) => t + 1)}
       />

@@ -59,10 +59,7 @@ export default function DashboardPage() {
     : user.email;
 
   const initials = (
-    hasName
-      ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`
-      : user.email[0] ?? "?"
-  ).toUpperCase();
+    hasName ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}` : user.email[0] ?? "?").toUpperCase();
 
   const contentLabel = getNavLabel(user.role, pathname);
   useTitle("Dashboard")
@@ -77,6 +74,7 @@ export default function DashboardPage() {
           role={user.role}
           activeHref={pathname}
           userInitials={initials}
+          avatarUrl={user.avatarUrl}
           userName={fullName}
           unreadMessages={unreadMessages}
           onLogout={() => setIsAreYouSureModalOpen(true)}
@@ -90,6 +88,7 @@ export default function DashboardPage() {
             breadcrumbs={["Compair", contentLabel]}
             statusLabel="Live workspace"
             userInitials={initials}
+            avatarUrl={user.avatarUrl}
             onMenuClick={() => setSidebarOpen(true)}
           />
 

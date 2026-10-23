@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Download, RotateCcw, Search } from "lucide-r
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
 import DataTable, { type DataTableColumn } from "../../../components/common/widgets/DataTable";
+import UserAvatar from "../../../components/common/widgets/UserAvatar";
 import PageHeader from "../components/PageHeader";
 import DashboardPage from "../components/DashboardPage";
 import DashboardPanel from "../components/DashboardPanel";
@@ -20,39 +21,50 @@ const accountColumns = (
   onSuspend: (account: Account) => void,
   onArchive: (account: Account) => void,
 ): DataTableColumn<Account>[] => [
-  {
-    key: "account",
-    label: "Account",
-    render: (account) => (
-      <>
-        <p className="text-[11px] font-bold text-[#102c50] dark:text-white">
-          {account.name}
-        </p>
-        <p className="mt-0.5 text-[9px] text-slate-400">
-          {account.email} · {account.id}
-        </p>
-      </>
-    ),
-  },
-  { key: "role", label: "Role" },
-  {
-    key: "status",
-    label: "Status",
-    render: (account) => (
-      <span
-        className={`inline-flex rounded px-2 py-1 text-[9px] font-bold ${
-          account.status === "Active"
-            ? "bg-[#e6f5ef] dark:bg-[#1d4775] text-[#15946a] dark:text-[#00d68f]"
-            : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-        }`}
-      >
-        {account.status}
-      </span>
-    ),
-  },
-  { key: "lastSignIn", label: "Last sign in" },
-  {
-    key: "actions",
+    {
+      key: "account",
+      label: "Account",
+      className: "w-[25%]",
+      render: (account) => {
+        const raw = account.raw;
+        const initials =
+          `${raw.first_name?.[0] ?? ""}${raw.last_name?.[0] ?? ""}`.toUpperCase() ||
+            (account.email?.[0] ?? "?").toUpperCase();
+
+        return (
+          <div className="flex items-center gap-3 min-w-0">
+            <UserAvatar avatarUrl={raw.avatar_url} initials={initials} />
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-bold text-[#102c50] dark:text-white">
+                {account.name}
+              </p>
+              <p className="mt-0.5 truncate text-[9px] text-slate-400">
+                {account.email} · {account.id}
+              </p>
+            </div>
+          </div>
+        );
+      },
+    },
+    { key: "role", label: "Role" },
+    {
+      key: "status",
+      label: "Status",
+      render: (account) => (
+        <span
+          className={`inline-flex rounded px-2 py-1 text-[9px] font-bold ${
+account.status === "Active"
+? "bg-[#e6f5ef] dark:bg-[#1d4775] text-[#15946a] dark:text-[#00d68f]"
+: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+}`}
+        >
+          {account.status}
+        </span>
+      ),
+    },
+    { key: "lastSignIn", label: "Last sign in" },
+    {
+      key: "actions",
     label: "Actions",
     render: (account) => (
       <AccountActions

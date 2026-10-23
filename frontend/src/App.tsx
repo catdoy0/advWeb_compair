@@ -31,6 +31,7 @@ import Technicians from './modules/dashboard/content/Technicians'
 import Staff from './modules/dashboard/content/Staff'
 import Reports from './modules/dashboard/content/Reports'
 import ArchivePage from './modules/dashboard/content/Archive'
+import ActivityLogs from './modules/dashboard/content/ActivityLogs'
 import LoadingScreen from './components/common/LoadingScreen'
 import { LoadingProvider } from './context/LoadingContext'
 import { EventProvider } from './context/EventContext'
@@ -79,6 +80,7 @@ export default function App() {
             <Route path={ROUTES.DASHBOARD.ADMINISTRATION} element={<Adminstration />} />
             <Route path={ROUTES.DASHBOARD.SETTINGS} element={<SettingsDashboard />} />
             <Route path={ROUTES.DASHBOARD.ARCHIVE} element={<ArchivePage />} />
+            <Route path={ROUTES.DASHBOARD.ACTIVITY_LOGS} element={<ActivityLogs />} />
 
             {/* Workspace / role-specific */}
             <Route path={ROUTES.DASHBOARD.WORKSPACE} element={<Workspace />} />

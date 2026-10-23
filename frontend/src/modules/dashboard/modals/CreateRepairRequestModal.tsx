@@ -9,6 +9,7 @@ import MessageModal from "../../../components/common/modals/MessageModal";
 import { useEnterKey } from "../../../hooks/useModalKeys";
 import { useAuth } from "../../../context/AuthContext";
 import { createRepairRequest } from "../../../api/repair_requests";
+import { getStoreSettings } from "../../../api/auth";
 import type { ComputerType } from "../../../types/repair_requests";
 import { getUsers } from "../../../api/administration";
 import type { GetUser } from "../../../types/administration";
@@ -28,18 +29,14 @@ const COMPUTER_TYPES: { value: ComputerType; label: string }[] = [
   { value: "OTHER", label: "Other" },
 ];
 
-// Generate time slots from 8:00 AM to 7:00 PM
-const TIME_SLOTS = Array.from({ length: 12 }, (_, i) => {
-  const hour24 = i + 8;
-  const hour12 = hour24 > 12 ? hour24 - 12 : hour24;
-  const ampm = hour24 >= 12 ? "PM" : "AM";
-  return {
-    value: `${String(hour24).padStart(2, "0")}:00`,
-    label: `${hour12}:00 ${ampm}`,
-  };
-});
-
 const MAX_DAYS_AHEAD = 14;
+const APPOINTMENT_DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function formatTimeLabel(value: string): string {
+  const [hourText, minute] = value.split(":");
+  const hour = Number(hourText);
+  return `${hour % 12 || 12}:${minute} ${hour >= 12 ? "PM" : "AM"}`;
+}
 
 interface CreateRepairRequestModalProps {
   open: boolean;
@@ -64,11 +61,15 @@ export default function CreateRepairRequestModal({
   const [selectedCustomer, setSelectedCustomer] = useState<GetUser | null>(null);
   const [computer, setComputer] = useState("");
   const [computerType, setComputerType] = useState<ComputerType>("LAPTOP");
-  const [serialNumber, setSerialNumber] = useState("");
+  // const [serialNumber, setSerialNumber] = useState("");
   const [requestedService, setRequestedService] = useState("");
   const [reportedProblem, setReportedProblem] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [availableDays, setAvailableDays] = useState<number[]>([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState("");
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -76,6 +77,36 @@ export default function CreateRepairRequestModal({
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [messageModalMessage, setMessageModalMessage] = useState("");
   const [messageWasSuccess, setMessageWasSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+
+    setAvailabilityLoading(true);
+    setAvailabilityError("");
+    getStoreSettings().then((settings) => {
+      if (cancelled) return;
+      if (!settings) {
+        setAvailableTimes([]);
+        setAvailableDays([]);
+        setAvailabilityError("Appointment availability could not be loaded.");
+      } else {
+        const times = settings.available_times ?? [];
+        const days = settings.available_days ?? APPOINTMENT_DAY_NAMES.map((_, index) => index + 1);
+        setAvailableTimes(times);
+        setAvailableDays(days);
+        setPreferredTime((current) => times.includes(current) ? current : "");
+        if (times.length === 0 || days.length === 0) {
+          setAvailabilityError("No appointment availability is currently configured.");
+        }
+      }
+      setAvailabilityLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open || !selectCustomer) return;
@@ -112,13 +143,22 @@ export default function CreateRepairRequestModal({
       if (picked.isAfter(today.add(MAX_DAYS_AHEAD, "day"), "day")) {
         return `Date must be within ${MAX_DAYS_AHEAD} days from today.`;
       }
+      const isoWeekday = ((picked.day() + 6) % 7) + 1;
+      if (availableDays.length > 0 && !availableDays.includes(isoWeekday)) {
+        const names = availableDays
+          .slice()
+          .sort((a, b) => a - b)
+          .map((day) => APPOINTMENT_DAY_NAMES[day - 1]);
+        return names.length === 1
+          ? `That day isn't available. The only available day is ${names[0]}.`
+          : `That day isn't available. Available days are ${names.join(", ")}.`;
+      }
     }
 
     if (name === "preferredTime") {
-      if (!value) return "Time is required.";
-      const hour = Number(value.split(":")[0]);
-      // Note: 19 is 7:00 PM, so the valid range is 8 to 19 inclusive
-      if (hour < 8 || hour > 19) return "Time must be between 8:00 AM and 7:00 PM.";
+      if (!value || !availableTimes.includes(value)) {
+        return "Choose an available time.";
+      }
     }
 
     return "";
@@ -158,7 +198,6 @@ export default function CreateRepairRequestModal({
         ...(selectCustomer && selectedCustomer ? { customer_id: selectedCustomer.id } : {}),
         computer_name: computer.trim(),
         computer_type: computerType,
-        serial_number: serialNumber.trim() || null,
         contact_detail: contactDetail.trim() || null,
         requested_service: requestedService.trim(),
         reported_problem: reportedProblem.trim(),
@@ -276,7 +315,7 @@ export default function CreateRepairRequestModal({
           <CommonInput
             variant="dashboard"
             id="computer"
-            label="Computer"
+            label="Computer Model"
             value={computer}
             onChange={(e) => handleFieldChange("computer", e.target.value, setComputer)}
             onBlur={() => handleFieldBlur("computer", computer)}
@@ -299,16 +338,16 @@ export default function CreateRepairRequestModal({
           </select>
         </div>
 
-        <div className="col-span-2">
-          <CommonInput
-            variant="dashboard"
-            id="serialNumber"
-            label="Serial number"
-            value={serialNumber}
-            onChange={(e) => setSerialNumber(e.target.value)}
-            placeholder="Optional"
-          />
-        </div>
+        {/* <div className="col-span-2"> */}
+        {/*   <CommonInput */}
+        {/*     variant="dashboard" */}
+        {/*     id="serialNumber" */}
+        {/*     label="Serial number" */}
+        {/*     value={serialNumber} */}
+        {/*     onChange={(e) => setSerialNumber(e.target.value)} */}
+        {/*     placeholder="Optional" */}
+        {/*   /> */}
+        {/* </div> */}
 
         <div className="col-span-2">
           <CommonInput
@@ -354,27 +393,16 @@ export default function CreateRepairRequestModal({
             value={preferredDate}
             min={minDate}
             max={maxDate}
-            onChange={(e) => handleFieldChange("preferredDate", e.target.value, setPreferredDate)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setPreferredDate(value);
+              setErrors((previous) => ({ ...previous, preferredDate: validateField("preferredDate", value) }));
+            }}
             onBlur={() => handleFieldBlur("preferredDate", preferredDate)}
             error={errors.preferredDate}
           />
         </div>
 
-
-        {/* <div className="col-span-2 sm:col-span-1"> */}
-        {/*   <CommonInput */}
-        {/*     variant="dashboard" */}
-        {/*     id="preferredTime" */}
-        {/*     label="Preferred time" */}
-        {/*     type="time" */}
-        {/*     value={preferredTime} */}
-        {/*     min="08:00" */}
-        {/*     max="19:00" */}
-        {/*     onChange={(e) => handleFieldChange("preferredTime", e.target.value, setPreferredTime)} */}
-        {/*     onBlur={() => handleFieldBlur("preferredTime", preferredTime)} */}
-        {/*     error={errors.preferredTime} */}
-        {/*   /> */}
-        {/* </div> */}
 
         <div className="col-span-2 sm:col-span-1">
           <label className={labelClass} htmlFor="preferredTime">Preferred time</label>
@@ -383,15 +411,23 @@ export default function CreateRepairRequestModal({
             value={preferredTime}
             onChange={(e) => handleFieldChange("preferredTime", e.target.value, setPreferredTime)}
             onBlur={() => handleFieldBlur("preferredTime", preferredTime)}
+            disabled={availabilityLoading || availableTimes.length === 0}
             className={`${selectClass} ${
-              errors.preferredTime ? "border-red-500 focus:border-red-500" : "border-[#cfd9e8] dark:border-slate-600"
+              errors.preferredTime || availabilityError
+                ? "border-red-500 focus:border-red-500"
+                : "border-[#cfd9e8] dark:border-slate-600"
             }`}
           >
-            <option value="" disabled>Select a time</option>
-            {TIME_SLOTS.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
+            <option value="" disabled>
+              {availabilityLoading ? "Loading availability..." : "Select a time"}
+            </option>
+            {availableTimes.map((time) => (
+              <option key={time} value={time}>{formatTimeLabel(time)}</option>
             ))}
           </select>
+          {availabilityError && (
+            <p className="mt-1 text-xs font-medium text-red-500">{availabilityError}</p>
+          )}
           {errors.preferredTime && (
             <p className="mt-1 text-xs font-medium text-red-500">{errors.preferredTime}</p>
           )}

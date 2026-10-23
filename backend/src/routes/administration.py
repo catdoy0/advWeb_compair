@@ -6,6 +6,7 @@ from src.models.users import UserRole
 from src.schemas.administration import GetUsers
 from src.security.auth import check_user_role
 from src.services.auth import get_current_user_id
+from src.services.activity_log import list_activity_logs, record_activity
 from src.sql import administration as admin_sql
 from src.sql import auth as auth_sql
 from src.sql import conversation as conversation_sql
@@ -85,6 +86,19 @@ def get_customers(
     return admin_sql.get_customers(page, page_size, search)
 
 
+@router.get("/activity-logs")
+def get_activity_logs(
+    request: Request,
+    response: Response,
+    search: str = Query("", max_length=200),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="Only administrators can view activity logs")
+    return list_activity_logs(search, page_size, (page - 1) * page_size)
+
+
 @router.post("/set-user-active")
 def set_user_active(
     request: Request,
@@ -124,7 +138,19 @@ def set_user_active(
                 detail="Cannot suspend the last remaining active super admin",
             )
 
-    return admin_sql.set_user_active(user_id, is_active)
+    target = admin_sql.get_user_identity(user_id)
+    updated = admin_sql.set_user_active(user_id, is_active)
+    if updated:
+        label = " ".join(part for part in ((target or {}).get("first_name") or "", (target or {}).get("last_name") or "") if part).strip()
+        record_activity(
+            current_user_id,
+            "ACCOUNT_SUSPENDED" if not is_active else "ACCOUNT_REACTIVATED",
+            f"{'Suspended' if not is_active else 'Reactivated'} account {label or 'account'} ({(target or {}).get('email', user_id)}).",
+            target_type="account",
+            target_id=user_id,
+            details={"is_active": is_active},
+        )
+    return updated
 
 
 @router.get("/archive/messages")
@@ -158,6 +184,10 @@ def archive_message_conversation(
         )
     if not conversation_sql.archive_conversation(conversation_id):
         raise HTTPException(status_code=409, detail="Conversation changed before it could be archived")
+    record_activity(
+        get_current_user_id(request), "CONVERSATION_ARCHIVED",
+        f"Archived conversation {conversation_id}.", target_type="conversation", target_id=conversation_id,
+    )
     return {"message": "Conversation archived."}
 
 
@@ -171,6 +201,10 @@ def restore_message_conversation(
         raise HTTPException(status_code=403, detail="You do not have permission to restore messages")
     if not conversation_sql.restore_conversation(conversation_id):
         raise HTTPException(status_code=404, detail="Archived conversation not found")
+    record_activity(
+        get_current_user_id(request), "CONVERSATION_RESTORED",
+        f"Restored conversation {conversation_id}.", target_type="conversation", target_id=conversation_id,
+    )
     return {"message": "Conversation restored."}
 
 
@@ -205,8 +239,13 @@ def archive_account(user_id: int, request: Request, response: Response):
         and admin_sql.count_active_super_admins() <= 1
     ):
         raise HTTPException(status_code=400, detail="Cannot archive the last active super admin")
+    target = admin_sql.get_user_identity(user_id)
     if not admin_sql.archive_user(user_id):
         raise HTTPException(status_code=404, detail="Account not found or already archived")
+    record_activity(
+        get_current_user_id(request), "ACCOUNT_ARCHIVED",
+        f"Archived account {(target or {}).get('email', user_id)}.", target_type="account", target_id=user_id,
+    )
     return {"message": "Account archived."}
 
 
@@ -214,8 +253,13 @@ def archive_account(user_id: int, request: Request, response: Response):
 def restore_account(user_id: int, request: Request, response: Response):
     if not check_user_role(request, response, [UserRole.SUPER_ADMIN]):
         raise HTTPException(status_code=403, detail="Only super admins can restore accounts")
+    target = admin_sql.get_user_identity(user_id)
     if not admin_sql.restore_user(user_id):
         raise HTTPException(status_code=404, detail="Archived account not found")
+    record_activity(
+        get_current_user_id(request), "ACCOUNT_RESTORED",
+        f"Restored account {(target or {}).get('email', user_id)}.", target_type="account", target_id=user_id,
+    )
     return {"message": "Account restored."}
 
 
@@ -276,11 +320,30 @@ def edit_user(
                 detail="Cannot demote the last remaining active super admin",
             )
 
+    previous_user = auth_sql.get_user_by_id(user.id)
     if not admin_sql.edit_user(user):
         raise HTTPException(
             status_code=400,
             detail="failed to edit user",
         )
+    changed = {}
+    if previous_user:
+        for key, before, after in (
+            ("first_name", previous_user.first_name, user.first_name),
+            ("last_name", previous_user.last_name, user.last_name),
+            ("email", previous_user.email, user.email),
+            ("role", previous_user.role.value, user.role),
+        ):
+            if before != after:
+                changed[key] = {"from": before, "to": after}
+    target_name = " ".join(part for part in (user.first_name or "", user.last_name or "") if part).strip() or user.email
+    description = f"Updated account {target_name}."
+    if "first_name" in changed or "last_name" in changed:
+        description = f"Changed account name to {target_name}."
+    record_activity(
+        current_user_id, "ACCOUNT_UPDATED", description,
+        target_type="account", target_id=user.id, details=changed,
+    )
     return "ok"
 
 
@@ -300,4 +363,10 @@ def reset_user_password(
     if not raw_password:
         raise HTTPException(status_code=400, detail="Failed to reset password")
 
+    target = auth_sql.get_user_by_id(user_id)
+    record_activity(
+        get_current_user_id(request), "PASSWORD_RESET_BY_ADMIN",
+        f"Reset the password for {target.email if target else f'account {user_id}'}.",
+        target_type="account", target_id=user_id,
+    )
     return {"password": raw_password}

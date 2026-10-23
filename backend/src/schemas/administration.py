@@ -12,6 +12,7 @@ class GetUsers(BaseModel):
     created_at: datetime | None = None
     is_active: bool
     last_sign_in: datetime
+    avatar_url: str | None = None
 
 class TotalUsers(BaseModel):
     total_accounts: int

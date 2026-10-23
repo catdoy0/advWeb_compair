@@ -1,6 +1,10 @@
+import logging
+from calendar import day_name
 from datetime import date, datetime
+from urllib.parse import quote
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
+from fastapi.responses import FileResponse
 
 from src.models.enums import UserRole
 from src.schemas.repair_note import CreateNoteRequest
@@ -11,18 +15,30 @@ from src.schemas.repair_request import (
     UpdateEstimateRequest,
 )
 from src.services import notification as notif_service
+from src.services.activity_log import record_activity
 from src.services.auth import require_active_user as _require_user
+from src.services.receipt import (
+    ensure_receipt_file,
+    receipt_file_storage_path,
+    resolve_receipt_file,
+)
+from src.services.store_settings import read_settings
 from src.sql import repair_note as note_sql
 from src.sql import repair_part as rp_sql
 from src.sql import repair_request as rr_sql
 from src.sql.auth import get_user_by_id
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 DAY_CAPACITY = 6
 
 
-def _validate_preferred_datetime(body: CreateRepairRequestRequest):
+def _validate_preferred_datetime(
+    body: CreateRepairRequestRequest,
+    available_times: list[str],
+    available_days: list[int],
+):
     now = datetime.now()
     preferred_dt = datetime.combine(body.preferred_date, body.preferred_time)
 
@@ -32,8 +48,20 @@ def _validate_preferred_datetime(body: CreateRepairRequestRequest):
     if (body.preferred_date - date.today()).days > 31:
         raise HTTPException(status_code=400, detail="Preferred date must be within 14 days")
 
-    if not (8 <= body.preferred_time.hour <= 19):
-        raise HTTPException(status_code=400, detail="Preferred time must be between 8:00 and 19:00")
+    if body.preferred_date.isoweekday() not in available_days:
+        available_day_names = [day_name[day - 1] for day in available_days]
+        if len(available_day_names) == 1:
+            detail = f"That date isn't available. The only available day is {available_day_names[0]}."
+        else:
+            detail = f"That date isn't available. Available days are {', '.join(available_day_names)}."
+        raise HTTPException(status_code=400, detail=detail)
+
+    preferred_time = body.preferred_time.strftime("%H:%M")
+    if preferred_time not in available_times:
+        raise HTTPException(
+            status_code=400,
+            detail="That appointment time is no longer available. Choose another time.",
+        )
 
 
 @router.post("", response_model=RepairRequestCreated)
@@ -57,7 +85,12 @@ async def create_repair_request(
             raise HTTPException(status_code=404, detail="Customer not found")
         customer_id = customer.id  # type: ignore[assignment]
 
-    _validate_preferred_datetime(body)
+    store_settings = read_settings()
+    _validate_preferred_datetime(
+        body,
+        store_settings.available_times,
+        store_settings.available_days,
+    )
 
     count = rr_sql.count_appointments_for_day(body.preferred_date)
     if count >= DAY_CAPACITY:
@@ -107,6 +140,20 @@ async def create_repair_request(
     customer_name = " ".join(
         p for p in [customer.first_name or "", customer.last_name or ""] if p # type: ignore
     ).strip() or customer.email # type: ignore
+
+    record_activity(
+        user.id,
+        "REPAIR_REQUEST_CREATED",
+        f"Created repair request {req.repair_number} for {customer_name}.",
+        target_type="repair",
+        target_id=req.id,
+        details={
+            "repair_number": req.repair_number,
+            "customer_id": customer_id,
+            "computer_name": device.computer_name,
+            "requested_service": body.requested_service,
+        },
+    )
 
     await notif_service.notify_team_new_repair_request(
         repair_request_id=req.id,
@@ -194,6 +241,20 @@ def assign_repair_technician(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if status is None:
         raise HTTPException(status_code=404, detail="Repair request not found.")
+    technician = get_user_by_id(technician_id) if technician_id is not None else None
+    technician_name = " ".join(
+        part for part in ((technician.first_name or ""), (technician.last_name or "")) if part
+    ).strip() if technician else "Unassigned"
+    detail = rr_sql.get_repair_detail(repair_request_id)
+    repair_number = detail["repair_number"] if detail else str(repair_request_id)
+    record_activity(
+        user.id,
+        "REPAIR_TECHNICIAN_ASSIGNED" if technician_id is not None else "REPAIR_TECHNICIAN_UNASSIGNED",
+        f"{('Assigned ' + technician_name + ' to') if technician_id is not None else 'Unassigned the technician from'} repair {repair_number}.",
+        target_type="repair",
+        target_id=repair_request_id,
+        details={"technician_id": technician_id, "status": status},
+    )
     return {"status": status, "technician_id": technician_id}
 
 
@@ -204,6 +265,17 @@ def unassign_technician_repairs(technician_id: int, request: Request):
         raise HTTPException(status_code=403, detail="Only administrators can unassign technicians.")
 
     count = rr_sql.unassign_open_repairs_for_technician(technician_id)
+    if count:
+        technician = get_user_by_id(technician_id)
+        technician_name = " ".join(
+            part for part in ((technician.first_name or ""), (technician.last_name or "")) if part
+        ).strip() if technician else f"technician {technician_id}"
+        record_activity(
+            user.id, "REPAIRS_UNASSIGNED",
+            f"Unassigned {count} open repair(s) from {technician_name}.",
+            target_type="technician", target_id=technician_id,
+            details={"unassigned_count": count},
+        )
     return {"unassigned_count": count}
 
 
@@ -244,6 +316,21 @@ def list_pos_recent(request: Request):
     return rr_sql.list_recent_repairs_for_pos()
 
 
+@router.get("/pos-search")
+def search_pos_repairs(
+    request: Request,
+    search: str = Query(""),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(6, ge=1, le=50),
+):
+    user = _require_user(request)
+
+    if user.role == UserRole.CUSTOMER:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return rr_sql.search_repairs_for_pos(search, page, page_size)
+
+
 @router.post("/{repair_request_id}/checkout")
 async def checkout_repair_route(repair_request_id: int, request: Request):
     """Release the repair — the customer has picked it up."""
@@ -256,13 +343,35 @@ async def checkout_repair_route(repair_request_id: int, request: Request):
     if detail is None:
         raise HTTPException(status_code=404, detail="Repair not found")
 
-    new_status, customer_id = rr_sql.checkout_repair(repair_request_id)
+    if user.id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    new_status, customer_id = rr_sql.checkout_repair(repair_request_id, user.id)
 
     if new_status is None or customer_id is None:
         raise HTTPException(
             status_code=400,
             detail="Repair cannot be checked out in its current state.",
         )
+
+    record_activity(
+        user.id, "REPAIR_CHECKED_OUT",
+        f"Checked out repair {detail['repair_number']}.",
+        target_type="repair", target_id=repair_request_id,
+        details={"repair_number": detail["repair_number"], "new_status": new_status},
+    )
+
+    receipt_ready = False
+    receipt_data = rr_sql.get_repair_receipt_data(repair_request_id)
+    if receipt_data is not None:
+        try:
+            path, _ = ensure_receipt_file(receipt_data)
+            receipt_ready = rr_sql.set_repair_receipt_path(
+                repair_request_id,
+                receipt_file_storage_path(path),
+            )
+        except Exception:
+            logger.exception("Failed to save receipt for repair %s", repair_request_id)
 
     await notif_service.notify_customer_status_changed(
         customer_id=customer_id,
@@ -271,7 +380,11 @@ async def checkout_repair_route(repair_request_id: int, request: Request):
         new_status=new_status,
     )
 
-    return {"status": new_status}
+    return {
+        "status": new_status,
+        "receipt_url": f"/repair-requests/{repair_request_id}/receipt",
+        "receipt_ready": receipt_ready,
+    }
 
 
 
@@ -290,6 +403,49 @@ def get_repair(
         raise HTTPException(status_code=403, detail="Forbidden")
 
     return detail
+
+
+@router.get("/{repair_request_id}/receipt")
+def get_repair_receipt(
+    repair_request_id: int,
+    request: Request,
+    download: bool = Query(False),
+):
+    user = _require_user(request)
+    access = rr_sql.get_repair_receipt_access(repair_request_id)
+    if access is None:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    if user.role == UserRole.CUSTOMER and access["customer_id"] != user.id:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+
+    path = (
+        resolve_receipt_file(access["receipt_path"])
+        if access["receipt_path"]
+        else None
+    )
+    if path is None:
+        receipt_data = rr_sql.get_repair_receipt_data(repair_request_id)
+        if receipt_data is None:
+            raise HTTPException(status_code=404, detail="Receipt not found")
+        try:
+            path, _ = ensure_receipt_file(receipt_data)
+            rr_sql.set_repair_receipt_path(
+                repair_request_id,
+                receipt_file_storage_path(path),
+            )
+        except Exception as exc:
+            logger.exception("Failed to generate receipt for repair %s", repair_request_id)
+            raise HTTPException(status_code=500, detail="Unable to generate receipt") from exc
+
+    disposition = "attachment" if download else "inline"
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{quote(path.name)}"',
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 
@@ -409,12 +565,28 @@ async def advance_repair(repair_request_id: int, request: Request):
     if user.role == UserRole.CUSTOMER:
         raise HTTPException(status_code=403, detail="Forbidden")
 
+    current_detail = rr_sql.get_repair_detail(repair_request_id)
+    if current_detail is None:
+        raise HTTPException(status_code=404, detail="Repair not found")
+    if current_detail["status"] == "COMPLETED" and not current_detail["checked_out"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Complete checkout in POS before releasing this repair.",
+        )
+
     tech_id = user.id if user.role == UserRole.TECHNICIAN else None
 
     new_status, customer_id = rr_sql.advance_repair_status(repair_request_id, tech_id)
 
     if new_status is None or customer_id is None:
         raise HTTPException(status_code=400, detail="This repair cannot be advanced further.")
+
+    record_activity(
+        user.id, "REPAIR_STATUS_CHANGED",
+        f"Changed repair {current_detail['repair_number']} from {current_detail['status']} to {new_status}.",
+        target_type="repair", target_id=repair_request_id,
+        details={"repair_number": current_detail["repair_number"], "from": current_detail["status"], "to": new_status},
+    )
 
     detail = rr_sql.get_repair_detail(repair_request_id)
     repair_number = detail["repair_number"] if detail else ""
@@ -435,12 +607,23 @@ async def reject_repair(repair_request_id: int, request: Request):
     if user.role == UserRole.CUSTOMER:
         raise HTTPException(status_code=403, detail="Forbidden")
 
+    previous_detail = rr_sql.get_repair_detail(repair_request_id)
+    if previous_detail is None:
+        raise HTTPException(status_code=404, detail="Repair not found")
+
     tech_id = user.id if user.role == UserRole.TECHNICIAN else None
 
     new_status, customer_id = rr_sql.reject_repair(repair_request_id, tech_id)
 
     if new_status is None or customer_id is None:
         raise HTTPException(status_code=400, detail="This repair cannot be rejected.")
+
+    record_activity(
+        user.id, "REPAIR_REJECTED",
+        f"Rejected repair {previous_detail['repair_number']}.",
+        target_type="repair", target_id=repair_request_id,
+        details={"repair_number": previous_detail["repair_number"], "from": previous_detail["status"], "to": new_status},
+    )
 
     detail = rr_sql.get_repair_detail(repair_request_id)
     repair_number = detail["repair_number"] if detail else ""
@@ -468,5 +651,13 @@ def update_estimate(
     ok = rr_sql.set_estimate_amount(repair_request_id, float(body.amount))
     if not ok:
         raise HTTPException(status_code=400, detail="Failed to update estimate")
+
+    detail = rr_sql.get_repair_detail(repair_request_id)
+    record_activity(
+        user.id, "REPAIR_ESTIMATE_UPDATED",
+        f"Updated the estimate for repair {detail['repair_number'] if detail else repair_request_id} to {float(body.amount):.2f}.",
+        target_type="repair", target_id=repair_request_id,
+        details={"amount": float(body.amount)},
+    )
 
     return {"amount": float(body.amount)}

@@ -1,4 +1,5 @@
 import {
+  Activity,
   Archive,
   BarChart3,
   CalendarDays,
@@ -31,6 +32,7 @@ const profileItem = { label: "Profile", href: dashboardPath(D.PROFILE), icon: Us
 const administrationItem = { label: "Administration", href: dashboardPath(D.ADMINISTRATION), icon: ShieldCheck };
 const settingsItem = { label: "Settings", href: dashboardPath(D.SETTINGS), icon: Settings };
 const archiveItem = { label: "Archive", href: dashboardPath(D.ARCHIVE), icon: Archive };
+const activityLogsItem = { label: "Activity logs", href: dashboardPath(D.ACTIVITY_LOGS), icon: Activity };
 
 const workspaceItem = { label: "Workspace", href: dashboardPath(D.WORKSPACE), icon: LayoutDashboard };
 const repairQueueItem = { label: "Repair Queue", href: dashboardPath(D.REPAIR_QUEUE), icon: Wrench };
@@ -80,13 +82,13 @@ const adminSections: DashboardSidebarSection[] = [
   },
   {
     label: "Manage",
-    items: [techniciansItem, staffItem, reportsItem, settingsItem, profileItem],
+    items: [techniciansItem, staffItem, reportsItem, activityLogsItem, settingsItem, profileItem],
   },
   // { label: "System", items: [archiveItem] },
 ];
 
 const superAdminSections: DashboardSidebarSection[] = [
-  { label: "Manage", items: [administrationItem, settingsItem, profileItem] },
+  { label: "Manage", items: [administrationItem, activityLogsItem, settingsItem, profileItem] },
   { label: "System", items: [archiveItem] },
 ];
 

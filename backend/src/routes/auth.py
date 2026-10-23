@@ -32,6 +32,7 @@ from src.security.tokens import (
     decode_password_reset_token,
 )
 from src.services.auth import (
+    get_current_user_id,
     refresh_session,
     revoke_refresh_token,
     serialize_user,
@@ -39,6 +40,7 @@ from src.services.auth import (
     signin_user,
     signup_user,
 )
+from src.services.activity_log import record_activity
 from src.services.store_settings import (
     read_settings,
     serialize_store_settings,
@@ -92,7 +94,22 @@ def update_store_settings(
             detail="You do not have permission to update store settings",
         )
 
+    previous = read_settings()
     write_settings(data)
+    changes = {}
+    for key in ("email", "number", "available_days", "available_times"):
+        before = getattr(previous, key)
+        after = getattr(data, key)
+        if before != after:
+            changes[key] = {"from": before, "to": after}
+    record_activity(
+        get_current_user_id(request),
+        "STORE_SETTINGS_UPDATED",
+        "Updated store settings" + (f": {', '.join(changes)}." if changes else "."),
+        target_type="store_settings",
+        target_id="workspace",
+        details=changes,
+    )
     return serialize_store_settings(read_settings())
 
 
@@ -145,6 +162,10 @@ def reset_password(data: PasswordResetRequest, response: Response):
     user, access_token, refresh_token = signin_user(
         LoginRequest(email=claims["email"], password=data.password)
     )
+    record_activity(
+        user.id, "PASSWORD_RESET", "Reset their account password.",
+        target_type="account", target_id=user.id,
+    )
     _set_auth_cookies(response, access_token, refresh_token)
     return {
         "message": "Password reset successfully",
@@ -177,6 +198,10 @@ def verify_reset_code(data: PasswordResetCodeRequest, request: Request, response
 @router.post("/signup")
 def signup(data: SignUpRequest, response: Response):
     user, access_token, refresh_token = signup_user(data)
+    record_activity(
+        user.id, "ACCOUNT_CREATED", "Created an account.",
+        target_type="account", target_id=user.id,
+    )
     _set_auth_cookies(response, access_token, refresh_token)
     store_settings = read_settings()
     return {

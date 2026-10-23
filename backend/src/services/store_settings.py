@@ -1,7 +1,11 @@
 import json
 from pathlib import Path
 
-from src.schemas.store_settings import StoreSettings
+from src.schemas.store_settings import (
+    DEFAULT_AVAILABLE_DAYS,
+    DEFAULT_AVAILABLE_TIMES,
+    StoreSettings,
+)
 
 # Resolve relative to the backend package, not the process working directory.
 # The server may be started from the repository root or another directory.
@@ -11,7 +15,12 @@ def read_settings() -> StoreSettings:
     """Reads the JSON file and returns a StoreSettings object."""
     if not FILE_PATH.exists():
         # Keep the public settings endpoint usable before the file is provisioned.
-        return StoreSettings.model_construct(email="", number="")
+        return StoreSettings.model_construct(
+            email="",
+            number="",
+            available_times=DEFAULT_AVAILABLE_TIMES.copy(),
+            available_days=DEFAULT_AVAILABLE_DAYS.copy(),
+        )
 
     with FILE_PATH.open("r", encoding="utf-8") as f:
         data = json.load(f)
@@ -29,5 +38,7 @@ def write_settings(settings: StoreSettings) -> None:
 def serialize_store_settings(store_settings: StoreSettings) -> dict:
     return {
         "email": store_settings.email,
-        "number": store_settings.number
+        "number": store_settings.number,
+        "available_times": store_settings.available_times,
+        "available_days": store_settings.available_days,
     }

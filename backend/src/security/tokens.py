@@ -39,6 +39,7 @@ def create_access_token(user: Users) -> str:
         "last_name": user.last_name,
         "email": user.email,
         "role": user.role.value,
+        "avatarUrl": user.avatar_url,
         "type": "access",
         "iss": JWT_ISSUER,
         "aud": JWT_AUDIENCE,

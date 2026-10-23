@@ -15,7 +15,7 @@ export default function SignInPage() {
 
   return (
     <QueryParamRedirect paramName="type" defaultValue="signin">
-      <main className="flex min-h-screen">
+      <main className="flex min-h-dvh w-full bg-white dark:bg-[#0b1a2e]">
         <SignInLeftPanel/>
 
         {authType === "signin" && <SignInFormSection />}

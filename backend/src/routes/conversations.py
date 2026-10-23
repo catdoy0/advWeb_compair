@@ -84,6 +84,7 @@ def get_conversation(conversation_id: int, request: Request):
         "id": conv.id,
         "customer_id": conv.customer_id,
         "repair_request_id": conv.repair_request_id,
+        "repair_status": conv_sql.get_conversation_repair_status(conversation_id),
         "created_at": conv.created_at,
         "last_message_at": conv.last_message_at,
     }

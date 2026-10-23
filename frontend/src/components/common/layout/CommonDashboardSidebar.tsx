@@ -26,6 +26,7 @@ interface CommonDashboardSidebarProps {
 
   user?: {
     initials: string
+    avatarUrl?: string | null
     name: string
     role: string
   }
@@ -150,7 +151,7 @@ export default function CommonDashboardSidebar({
           <div className="shrink-0 border-t border-[#1c3552] p-4">
             <div className="flex justify-between items-center gap-3">
               <div className="flex gap-2 items-center">
-                <UserAvatar initials={user.initials} tone="sidebar" />
+                <UserAvatar initials={user.initials} avatarUrl={user.avatarUrl} tone="sidebar" />
 
                 <div className="flex flex-col gap-1">
                   <p className="min-w-0 flex-1 truncate text-xs font-semibold text-white">
