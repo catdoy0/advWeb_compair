@@ -1,6 +1,12 @@
 import { API_URL } from "./config";
 import type { StoreSettings, UserSession, SignUpPayload } from "../types/auth";
 
+function normalizeUserSession(data: UserSession): UserSession {
+  const user = data.user;
+  const avatarUrl = user.avatarUrl ?? user.avatar_url ?? null;
+  return { ...data, user: { ...user, avatarUrl } };
+}
+
 async function readError(res: Response, fallback: string): Promise<string> {
   try {
     const data = await res.json();
@@ -40,7 +46,7 @@ export async function googleSignIn(credential: string): Promise<{
     if (!res.ok) {
       return { session: null, error: await readError(res, "Google sign-in failed.") };
     }
-    return { session: await res.json(), error: "" };
+    return { session: normalizeUserSession(await res.json()), error: "" };
   } catch {
     return { session: null, error: "Unable to contact the server. Please try again." };
   }
@@ -125,7 +131,7 @@ export async function login(email: string, password: string): Promise<UserSessio
     body: JSON.stringify({email, password}),
   });
   if (!res.ok) return null;
-  return await res.json();
+  return normalizeUserSession(await res.json());
 }
 
 
@@ -138,7 +144,7 @@ export async function signUp(payload: SignUpPayload): Promise<UserSession | null
     body: JSON.stringify(payload),
   });
   if (!res.ok) return null;
-  return await res.json();
+  return normalizeUserSession(await res.json());
 }
 
 
@@ -195,7 +201,7 @@ export async function session(): Promise<UserSession | null> {
       role !== "SUPER_ADMIN"
     ) return null;
 
-    return data as UserSession;
+    return normalizeUserSession(data as UserSession);
   } catch {
     return null;
   }

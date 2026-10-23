@@ -71,6 +71,7 @@ export default function TeamAppointments() {
   const [appointments, setAppointments] = useState<ApiAppointment[]>([]);
   const [countsByDay, setCountsByDay] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const weekDays = getWeekDays(weekReference);
   const weekStart = weekDays[0].date.format("YYYY-MM-DD");
@@ -117,7 +118,7 @@ export default function TeamAppointments() {
     return () => {
       cancelled = true;
     };
-  }, [ready, selectedDate, weekStart, weekEnd]);
+  }, [ready, selectedDate, weekStart, weekEnd, refreshTick]);
 
 
   const handlePreviousWeek = () => {
@@ -262,6 +263,8 @@ export default function TeamAppointments() {
             <DataTable
               columns={columns}
               data={appointments}
+              onRefresh={() => setRefreshTick((tick) => tick + 1)}
+              refreshing={loading}
               emptyMessage="No appointments scheduled for this day."
             />
           )}

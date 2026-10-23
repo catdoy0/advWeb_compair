@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Check, FileText, Package, Pencil, Trash2 } from "lucide-react";
+import { ArrowRight, Check, FileText, Package, Pencil, ShoppingCart, Trash2 } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { useNavigate } from "react-router";
 
 import RightSidebar from "../../../../components/common/modals/RightSideBar";
 import CommonButton from "../../../../components/common/widgets/CommonButton";
+import { useAuth } from "../../../../context/AuthContext";
+import { ROUTES } from "../../../../routes";
 import {
   advanceRepairStatus,
   getRepairDetail,
@@ -109,6 +112,9 @@ function RepairDetailContent({
   repairRequestId,
   onUpdated,
 }: RepairDetailModalProps & { repairRequestId: number }) {
+  const { session } = useAuth();
+  const navigate = useNavigate();
+  const isStaff = session?.user.role === "STAFF";
   const [detail, setDetail] = useState<RepairDetail | null>(null);
   const [notes, setNotes] = useState<RepairNote[]>([]);
   const [parts, setParts] = useState<RepairPartUsage[]>([]);
@@ -221,6 +227,19 @@ function RepairDetailContent({
         </CommonButton>
       </div>
 
+      {isStaff && (
+        <CommonButton
+          variant="outline"
+          onClick={() =>
+            navigate(`${ROUTES.DASHBOARD.ROOT}/${ROUTES.DASHBOARD.POS}`)
+          }
+          className="mt-2 flex w-full items-center justify-center gap-2 border-[#d4ddea] px-4 py-2"
+        >
+          <ShoppingCart size={13} />
+          Go to POS
+        </CommonButton>
+      )}
+
       {advanceError && (
         <p className="mt-2 text-center text-xs font-medium text-red-500">
           {advanceError}
@@ -232,11 +251,19 @@ function RepairDetailContent({
             setAdvanceError("");
             setConfirmAdvanceOpen(true);
           }}
-          disabled={advancing}
+          disabled={
+            advancing || (nextStep.key === "RELEASED" && !detail.checked_out)
+          }
           className="mt-2 flex w-full items-center justify-center gap-2 px-4 py-2.5 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {advancing ? "Updating..." : `Move to ${nextStep.label}`}
-          {!advancing && <ArrowRight size={13} />}
+          {advancing
+            ? "Updating..."
+            : nextStep.key === "RELEASED" && !detail.checked_out
+              ? "Checkout required before release"
+              : `Move to ${nextStep.label}`}
+          {!advancing && !(nextStep.key === "RELEASED" && !detail.checked_out) && (
+            <ArrowRight size={13} />
+          )}
         </CommonButton>
       )}
     </>
@@ -455,6 +482,11 @@ done
             label="Technician"
             value={detail.technician_name || "Unassigned"}
             muted={!detail.technician_name}
+          />
+          <Field
+            label="Checkout"
+            value={detail.checked_out ? "Checked out" : "Not checked out"}
+            muted={!detail.checked_out}
           />
           <div>
             <p className="text-[10px] text-slate-400">Estimated cost</p>

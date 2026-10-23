@@ -12,6 +12,12 @@ alembic upgrade head
 uvicorn src.main:app --port 8080 --host 0.0.0.0
 ```
 
+## Database snapshots
+
+The administrator dashboard can create and download PostgreSQL custom-format snapshots using `pg_dump`. The backend stores them under `backend/assets/backups` with a SHA-256 checksum manifest. Restoring a snapshot is limited to super admins, validates the archive, and automatically creates a `pre_restore` snapshot first. `pg_restore` applies the archived objects and data in one transaction; on failure, the transaction rolls back and the service reapplies the safety snapshot. As with `pg_restore --clean`, objects that were created after the dump but are absent from its archive are not removed. A database dump also does not include uploaded avatar/receipt files or `store_settings.json`.
+
+Install the PostgreSQL client tools on the backend host so `pg_dump` and `pg_restore` are available on `PATH` (for Debian/Ubuntu, install `postgresql-client`). Keep downloaded `.dump` files somewhere separate from the app host for an off-server copy. These are logical PostgreSQL database snapshots, not filesystem-level or Btrfs snapshots.
+
 env
 ```sh
 DATABASE_URL=

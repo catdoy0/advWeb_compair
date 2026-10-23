@@ -1,7 +1,9 @@
-import { ChevronLeft, ChevronRight, Download, RotateCcw, Search } from "lucide-react";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
 import DataTable, { type DataTableColumn } from "../../../components/common/widgets/DataTable";
+import UserAvatar from "../../../components/common/widgets/UserAvatar";
 import PageHeader from "../components/PageHeader";
 import DashboardPage from "../components/DashboardPage";
 import DashboardPanel from "../components/DashboardPanel";
@@ -12,6 +14,7 @@ import AccountActions from "./administration/AccountActions";
 import AccountFilterButton from "./administration/AccountFilterButton";
 import SummaryCard from "./administration/SummaryCard";
 import EditAccountModal from "./administration/EditAccountModal";
+import DatabaseBackups from "./DatabaseBackups";
 import type { Account } from "./administration/types";
 import { useAccountsAdmin } from "../../../hooks/administration";
 
@@ -20,39 +23,51 @@ const accountColumns = (
   onSuspend: (account: Account) => void,
   onArchive: (account: Account) => void,
 ): DataTableColumn<Account>[] => [
-  {
-    key: "account",
-    label: "Account",
-    render: (account) => (
-      <>
-        <p className="text-[11px] font-bold text-[#102c50] dark:text-white">
-          {account.name}
-        </p>
-        <p className="mt-0.5 text-[9px] text-slate-400">
-          {account.email} · {account.id}
-        </p>
-      </>
-    ),
-  },
-  { key: "role", label: "Role" },
-  {
-    key: "status",
-    label: "Status",
-    render: (account) => (
-      <span
-        className={`inline-flex rounded px-2 py-1 text-[9px] font-bold ${
-          account.status === "Active"
-            ? "bg-[#e6f5ef] dark:bg-[#1d4775] text-[#15946a] dark:text-[#00d68f]"
-            : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-        }`}
-      >
-        {account.status}
-      </span>
-    ),
-  },
-  { key: "lastSignIn", label: "Last sign in" },
-  {
-    key: "actions",
+    {
+      key: "account",
+      label: "Account",
+      className: "w-[25%]",
+      sortValue: (account) => account.name,
+      render: (account) => {
+        const raw = account.raw;
+        const initials =
+          `${raw.first_name?.[0] ?? ""}${raw.last_name?.[0] ?? ""}`.toUpperCase() ||
+            (account.email?.[0] ?? "?").toUpperCase();
+
+        return (
+          <div className="flex items-center gap-3 min-w-0">
+            <UserAvatar avatarUrl={raw.avatar_url} initials={initials} />
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-bold text-[#102c50] dark:text-white">
+                {account.name}
+              </p>
+              <p className="mt-0.5 truncate text-[9px] text-slate-400">
+                {account.email} · {account.id}
+              </p>
+            </div>
+          </div>
+        );
+      },
+    },
+    { key: "role", label: "Role" },
+    {
+      key: "status",
+      label: "Status",
+      render: (account) => (
+        <span
+          className={`inline-flex rounded px-2 py-1 text-[9px] font-bold ${
+account.status === "Active"
+? "bg-[#e6f5ef] dark:bg-[#1d4775] text-[#15946a] dark:text-[#00d68f]"
+: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+}`}
+        >
+          {account.status}
+        </span>
+      ),
+    },
+    { key: "lastSignIn", label: "Last sign in", sortValue: (account) => account.lastSignIn },
+    {
+      key: "actions",
     label: "Actions",
     render: (account) => (
       <AccountActions
@@ -67,6 +82,7 @@ const accountColumns = (
 
 export default function Adminstration() {
   const admin = useAccountsAdmin();
+  const [snapshotCount, setSnapshotCount] = useState(0);
 
   const columns = accountColumns(
     admin.handleEditClick,
@@ -135,10 +151,9 @@ export default function Adminstration() {
         />
 
         <SummaryCard
-          label="Latest backup"
-          value="None"
-          detail="Create a recoverable workspace copy"
-          valueText
+          label="Database snapshots"
+          value={snapshotCount}
+          detail="saved database backups"
         />
       </div>
 
@@ -205,6 +220,8 @@ export default function Adminstration() {
           <DataTable
             columns={columns}
             data={admin.accounts}
+            onRefresh={admin.reload}
+            refreshing={admin.loading}
             emptyMessage="No accounts found for this role."
           />
         )}
@@ -237,43 +254,7 @@ export default function Adminstration() {
         </div>
       </DashboardPanel>
 
-      <DashboardPanel
-        className="mt-8"
-        title="Workspace backups"
-        description="Create a point-in-time copy before major changes."
-        headerClassName="flex-col items-start px-5 py-3 sm:flex-row sm:items-center sm:justify-between"
-        headerAction={
-          <div className="flex gap-2">
-            <CommonButton
-              variant="outline"
-              className="flex items-center gap-2 border-[#d4ddea] px-4 py-2"
-              disabled
-            >
-              <RotateCcw size={14} />
-              Restore backup
-            </CommonButton>
-
-            <CommonButton className="flex items-center gap-2 px-4 py-2">
-              <Download size={14} />
-              Create backup
-            </CommonButton>
-          </div>
-        }
-      >
-        <div className="flex min-h-[210px] flex-col items-center justify-center text-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#eef4ff] text-[#2870e8]">
-            <Download size={16} />
-          </div>
-
-          <h3 className="mt-4 text-[14px] font-bold text-[#102c50] dark:text-white">
-            No backups yet
-          </h3>
-
-          <p className="mt-1 text-[11px] text-slate-400">
-            Create one before changing account access or inventory.
-          </p>
-        </div>
-      </DashboardPanel>
+      <DatabaseBackups onSnapshotCountChange={setSnapshotCount} />
     </DashboardPage>
   );
 }

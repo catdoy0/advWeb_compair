@@ -62,7 +62,7 @@ export default function SignInFormSection() {
   return (
     <div className="relative flex w-full flex-col items-center justify-center bg-white px-6 py-12 transition-colors duration-300 dark:bg-[#0b1a2e] lg:w-1/2">
       <BackButton hideOnDesktop={true} variant="absolute"/>
-      <DarkModeButton variant="absolute"/>
+      <DarkModeButton variant="absolute" />
 
       <div className="w-full max-w-sm modal-open">
         <p className="text-xs font-bold tracking-widest text-[#2d65c8] dark:text-blue-400">

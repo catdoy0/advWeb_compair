@@ -16,7 +16,7 @@ interface GoogleIdentityServices {
         options: {
           theme: "outline";
           size: "large";
-          text: "signin_with";
+          text: "signin_with" | "signup_with";
           shape: "rectangular";
           width: number;
         },
@@ -57,9 +57,11 @@ function loadGoogleIdentityServices(): Promise<void> {
 export default function GoogleSignInButton({
   onCredential,
   onError,
+  text = "signin_with",
 }: {
   onCredential: (credential: string) => void;
   onError: (message: string) => void;
+  text?: "signin_with" | "signup_with";
 }) {
   const buttonRef = useRef<HTMLDivElement>(null);
   const onCredentialRef = useRef(onCredential);
@@ -88,7 +90,7 @@ export default function GoogleSignInButton({
         window.google.accounts.id.renderButton(buttonRef.current, {
           theme: "outline",
           size: "large",
-          text: "signin_with",
+          text,
           shape: "rectangular",
           width: 320,
         });
@@ -101,7 +103,7 @@ export default function GoogleSignInButton({
       mounted = false;
       if (buttonRef.current) buttonRef.current.replaceChildren();
     };
-  }, []);
+  }, [text]);
 
   return <div ref={buttonRef} className="flex min-h-10 justify-center" />;
 }

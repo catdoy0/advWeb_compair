@@ -21,6 +21,7 @@ class ConversationSummary(BaseModel):
 
     # repair context if this thread is about a repair
     repair_number: str | None
+    repair_status: str | None
     device_label: str | None
 
     preview: str | None          # last message content
@@ -49,6 +50,7 @@ class ConversationDetail(BaseModel):
     customer_id: int
     repair_request_id: int | None
     repair_number: str | None
+    repair_status: str | None
     device_label: str | None
     created_at: datetime
     last_message_at: datetime

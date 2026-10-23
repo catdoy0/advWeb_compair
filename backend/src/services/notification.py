@@ -26,8 +26,7 @@ async def notify_team_new_repair_request(
 
     title = f"New repair request · {repair_number}"
     body = f"{customer_name} — {computer_name}"
-    # link = f"/dashboard/repair-queue/{repair_request_id}"
-    link = "/dashboard/repair-queue"
+    link = f"/dashboard/repair-queue?id={repair_request_id}"
 
     rows = notif_sql.create_notifications(
         user_ids=team_ids,
@@ -62,7 +61,7 @@ async def notify_customer_status_changed(
     label = STATUS_LABEL.get(new_status, new_status)
     title = f"Repair {repair_number} · {label}"
     body = f"Your repair is now {label.lower()}."
-    link = "/dashboard/mydevices"
+    link = f"/dashboard/mydevices?id={repair_request_id}"
 
     notif_sql.create_notifications(
         user_ids=[customer_id],

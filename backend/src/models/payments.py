@@ -32,5 +32,7 @@ class Payments(SQLModel, table=True):
         index=True,
     )
 
+    receipt_path: str | None = Field(default=None, max_length=512)
+
     paid_at: datetime | None = None
     created_at: datetime

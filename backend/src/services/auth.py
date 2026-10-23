@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
 import secrets
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
@@ -27,6 +27,13 @@ def serialize_user(user: Users) -> dict:
         "firstName": user.first_name,
         "lastName": user.last_name,
         "role": user.role.value,
+        "avatarUrl": user.avatar_url,
+        "avatar_url": user.avatar_url,
+        "nameChangeAvailableAt": (
+            (_utc(user.name_updated_at) + timedelta(days=7)).isoformat()
+            if user.name_updated_at is not None
+            else None
+        ),
     }
 
 
@@ -105,6 +112,11 @@ def signin_google_user(claims: dict) -> tuple[Users, str, str]:
                     status_code=409,
                     detail="Sign in with your password first to link this Google account",
                 )
+            if existing.id == None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="existing.id missing",
+                )
             user = auth_sql.link_google_identity(
                 existing.id,
                 google_id,
@@ -140,7 +152,6 @@ def signin_google_user(claims: dict) -> tuple[Users, str, str]:
         raise HTTPException(status_code=409, detail="Unable to link this Google account")
     if not user.is_active or user.archived_at is not None:
         raise HTTPException(status_code=403, detail="Account is disabled")
-
     auth_sql.delete_expired_refresh()
     if user.id:
         auth_sql.update_last_sign_in(user.id)

@@ -1,6 +1,8 @@
 __pycache__/
 .ruff_cache/
 .venv/
+assets/avatars/
+assets/receipts/
 
 .env
 

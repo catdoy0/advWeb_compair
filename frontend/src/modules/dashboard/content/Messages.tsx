@@ -43,17 +43,28 @@ function conversationTitle(conv: Conversation, isCustomer: boolean): string {
   return conv.repair_number || "Repair";
 }
 
+function formatRepairStatus(status: string | null): string | null {
+  if (!status) return null;
+  return status
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function conversationSubtitle(conv: Conversation, isCustomer: boolean): string {
+  const repairStatus = formatRepairStatus(conv.repair_status);
   if (!isCustomer) {
     if (conv.repair_number) {
-      return conv.device_label
-        ? `${conv.repair_number} · ${conv.device_label}`
-        : conv.repair_number;
+      return [conv.repair_number, conv.device_label, repairStatus]
+        .filter(Boolean)
+        .join(" · ");
     }
     return "";
   }
   if (conv.repair_request_id === null) return "General support";
-  return conv.device_label || "Repair chat";
+  return [conv.device_label || "Repair chat", repairStatus]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 

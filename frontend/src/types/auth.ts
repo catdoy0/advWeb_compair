@@ -12,12 +12,17 @@ export interface UserSession {
     firstName: string;
     lastName: string;
     role: Role;
+    avatarUrl?: string | null;
+    avatar_url?: string | null;
+    nameChangeAvailableAt?: string | null;
   };
 }
 
 export interface StoreSettings {
   email: string;
   number: string;
+  available_times: string[];
+  available_days: number[];
 }
 
 

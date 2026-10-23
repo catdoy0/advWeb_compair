@@ -61,6 +61,7 @@ export default function Customers() {
       key: "customer",
       label: "Customer",
       className: "min-w-[220px]",
+      sortValue: (customer) => customerName(customer),
       render: (customer) => (
         <>
           <p className="font-semibold text-[#102c50] dark:text-white">{customerName(customer)}</p>
@@ -184,6 +185,8 @@ export default function Customers() {
           <DataTable
             columns={columns}
             data={customers}
+            onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            refreshing={loading}
             emptyMessage={search ? "No customers match your search." : "No customer accounts yet."}
           />
         )}

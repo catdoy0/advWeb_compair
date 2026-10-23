@@ -107,6 +107,7 @@ export interface RepairDetail {
   diagnosis: string | null;
   estimate_amount: number | null;
   final_amount: number | null;
+  checked_out: boolean;
 
   appointment_date: string | null;
   appointment_time: string | null;
@@ -146,6 +147,7 @@ export interface CustomerDevice {
   repair_number: string | null;
   repair_status: RepairQueueStatus | null;
   estimate_amount: number | null;
+  receipt_available?: boolean;
 }
 
 export interface TeamDevice extends CustomerDevice {

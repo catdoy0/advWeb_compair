@@ -6,6 +6,7 @@ import {
   Plus,
 } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
+import { Link } from "react-router";
 
 import CommonButton from "../../../../components/common/widgets/CommonButton";
 import DataTable, {
@@ -166,24 +167,39 @@ export default function CustomerAppointments() {
     {
       key: "scheduled_time",
       label: "Time",
-      className: "w-[16%]",
+      className: "w-[14%]",
       render: (a) => formatTime(a.scheduled_time),
     },
     {
       key: "computer_name",
       label: "Computer",
-      className: "w-[32%]",
+      className: "w-[25%]",
     },
     {
       key: "requested_service",
       label: "Service",
-      className: "w-[32%]",
+      className: "w-[27%]",
     },
     {
       key: "status",
       label: "Status",
-      className: "w-[20%]",
+      className: "w-[18%]",
       render: (a) => <StatusBox status={toStatusEnum(a.status)} />,
+    },
+    {
+      key: "repair_detail",
+      label: "",
+      className: "w-[16%]",
+      sortable: false,
+      render: (a) => (
+        <Link
+          to={`/dashboard/mydevices?id=${a.repair_request_id}`}
+          className="flex items-center gap-1 text-[11px] font-semibold text-[#2870e8] hover:underline"
+        >
+          View details
+          <ChevronRight size={12} />
+        </Link>
+      ),
     },
   ];
 
@@ -299,6 +315,8 @@ export default function CustomerAppointments() {
             <DataTable
               columns={columns}
               data={appointments}
+              onRefresh={() => setRefreshTick((tick) => tick + 1)}
+              refreshing={loading}
               emptyMessage="No appointments scheduled for this day."
             />
           )}

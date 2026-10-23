@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,9 +14,10 @@ import DataTable, {
 import PageHeader from "../components/PageHeader";
 import DashboardPage from "../components/DashboardPage";
 import DashboardPanel from "../components/DashboardPanel";
+import MessageModal from "../../../components/common/modals/MessageModal";
 import CustomerRepairDetailModal from "./repair-queue/CustomerRepairDetailModal";
 
-import { listMyDevices } from "../../../api/repair_requests";
+import { getRepairReceipt, listMyDevices } from "../../../api/repair_requests";
 import type { CustomerDevice } from "../../../types/repair_requests";
 
 const PAGE_SIZE = 10;
@@ -58,9 +60,47 @@ function formatMoney(value: number | null): string {
 }
 
 export default function MyDevices() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [devices, setDevices] = useState<CustomerDevice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [selectedRepairId, setSelectedRepairId] = useState<number | null>(null);
+  const [receiptNoticeOpen, setReceiptNoticeOpen] = useState(false);
+  const [receiptNotice, setReceiptNotice] = useState("");
+
+  useEffect(() => {
+    const id = Number(searchParams.get("id"));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedRepairId(Number.isInteger(id) && id > 0 ? id : null);
+  }, [searchParams]);
+
+  function closeRepairDetails() {
+    setSelectedRepairId(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete("id");
+    setSearchParams(next, { replace: true });
+  }
+
+  async function handleViewReceipt(repairRequestId: number) {
+    const receiptWindow = window.open("about:blank", "_blank");
+    if (!receiptWindow) {
+      setReceiptNotice("Allow pop-ups to open the receipt PDF.");
+      setReceiptNoticeOpen(true);
+      return;
+    }
+
+    const receipt = await getRepairReceipt(repairRequestId);
+    if (!receipt) {
+      receiptWindow.close();
+      setReceiptNotice("The receipt could not be loaded. Please try again later.");
+      setReceiptNoticeOpen(true);
+      return;
+    }
+
+    const receiptUrl = URL.createObjectURL(receipt);
+    receiptWindow.location.href = receiptUrl;
+    window.setTimeout(() => URL.revokeObjectURL(receiptUrl), 60_000);
+  }
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -78,7 +118,7 @@ export default function MyDevices() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshTick]);
 
   // filter + search (client-side)
   const filtered = useMemo(() => {
@@ -181,23 +221,40 @@ export default function MyDevices() {
       className: "w-[14%]",
       render: (d) =>
         d.repair_request_id ? (
-          <button
-            type="button"
-            onClick={() => setSelectedRepairId(d.repair_request_id!)}
-            className="flex items-center gap-1 text-[11px] font-semibold text-[#2870e8] hover:underline"
-          >
-            View details
-            <ChevronRight size={12} />
-          </button>
+          <div className="flex flex-col items-start gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedRepairId(d.repair_request_id!)}
+              className="flex items-center gap-1 text-[11px] font-semibold text-[#2870e8] hover:underline"
+            >
+              View details
+              <ChevronRight size={12} />
+            </button>
+            {d.receipt_available && (
+              <button
+                type="button"
+                onClick={() => handleViewReceipt(d.repair_request_id!)}
+                className="text-[11px] font-semibold text-[#2870e8] hover:underline"
+              >
+                View receipt
+              </button>
+            )}
+          </div>
         ) : null,
     },
   ];
 
   return (
     <DashboardPage>
+      <MessageModal
+        open={receiptNoticeOpen}
+        onClose={() => setReceiptNoticeOpen(false)}
+        header="Receipt"
+        title={receiptNotice}
+      />
       <CustomerRepairDetailModal
         open={selectedRepairId !== null}
-        onClose={() => setSelectedRepairId(null)}
+        onClose={closeRepairDetails}
         repairRequestId={selectedRepairId}
       />
 
@@ -269,6 +326,8 @@ export default function MyDevices() {
           <DataTable
             columns={columns}
             data={pageItems}
+            onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            refreshing={loading}
             emptyMessage="No computers match your filters."
           />
         )}

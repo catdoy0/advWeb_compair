@@ -29,7 +29,17 @@ export default function NotificationBell() {
       await markRead(n.id);
     }
     setOpen(false);
-    if (n.link) navigate(n.link);
+    if (n.link) {
+      const destination = new URL(n.link, window.location.origin);
+      if (
+        n.reference_id !== null &&
+        (n.type === "NEW_REPAIR_REQUEST" ||
+          n.type === "REPAIR_STATUS_CHANGED")
+      ) {
+        destination.searchParams.set("id", String(n.reference_id));
+      }
+      navigate(`${destination.pathname}${destination.search}${destination.hash}`);
+    }
   }
 
   return (
@@ -50,7 +60,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-[340px] overflow-hidden rounded-lg border border-[#e5edf7] bg-white shadow-lg dark:border-slate-700 dark:bg-[#0f1724]">
+        <div className="absolute right-0 mt-2 w-[340px] z-999 overflow-hidden rounded-lg border border-[#e5edf7] bg-white shadow-lg dark:border-slate-700 dark:bg-[#0f1724]">
           {/* header */}
           <div className="flex items-center justify-between border-b border-[#e5edf7] px-4 py-3 dark:border-slate-700">
             <p className="text-[12px] font-bold text-[#102c50] dark:text-white">

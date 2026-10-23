@@ -1,5 +1,6 @@
 import secrets
 from datetime import date, datetime, time, timezone
+from decimal import Decimal
 
 from sqlalchemy import text
 from sqlmodel import Session, select
@@ -8,7 +9,15 @@ from src.database import engine
 from src.models.appointments import Appointments
 from src.models.conversations import Conversations
 from src.models.devices import Devices
-from src.models.enums import AppointmentStatus, ComputerType, RepairRequestStatus, UserRole
+from src.models.enums import (
+    AppointmentStatus,
+    ComputerType,
+    PaymentMethod,
+    PaymentStatus,
+    RepairRequestStatus,
+    UserRole,
+)
+from src.models.payments import Payments
 from src.models.repair_requests import Repair_Requests
 from src.models.repairs import Repairs
 from src.models.users import Users
@@ -423,6 +432,7 @@ def _serialize_repair_detail(row) -> dict:
         "final_amount": (
             float(row["final_amount"]) if row["final_amount"] is not None else None
         ),
+        "checked_out": bool(row["checked_out"]),
         "appointment_date": row["appointment_date"],
         "appointment_time": row["appointment_time"],
     }
@@ -454,6 +464,14 @@ def _get_repair_detail(column: str, value: int | str) -> dict | None:
                 r.diagnosis,
                 r.estimate_amount,
                 r.final_amount,
+                EXISTS (
+                    SELECT 1
+                    FROM repairs paid_repair
+                    JOIN payments p
+                      ON p.repair_id = paid_repair.id
+                     AND p.status = 'PAID'
+                    WHERE paid_repair.repair_request_id = rr.id
+                ) AS checked_out,
                 a.scheduled_date AS appointment_date,
                 a.scheduled_time AS appointment_time
             FROM repair_requests rr
@@ -563,6 +581,20 @@ def advance_repair_status(
 
         next_status_value = WORKFLOW_ORDER[current_index + 1]
 
+        if next_status_value == "RELEASED":
+            repair = s.exec(
+                select(Repairs).where(Repairs.repair_request_id == repair_request_id)
+            ).first()
+            if repair is None:
+                return None, None
+            paid_payment = s.exec(
+                select(Payments)
+                .where(Payments.repair_id == repair.id)
+                .where(Payments.status == PaymentStatus.PAID)
+            ).first()
+            if paid_payment is None:
+                return None, None
+
         req.status = RepairRequestStatus(next_status_value)
         req.updated_at = _now()
 
@@ -658,7 +690,13 @@ def list_devices_for_customer(customer_id: int) -> list[dict]:
                     rr.repair_number,
                     rr.status        AS repair_status,
                     rr.created_at    AS repair_created_at,
-                    r.estimate_amount
+                    r.estimate_amount,
+                    EXISTS (
+                        SELECT 1
+                        FROM payments p
+                        WHERE p.repair_id = r.id
+                          AND p.status = 'PAID'
+                    ) AS receipt_available
                 FROM devices d
                 LEFT JOIN LATERAL (
                     SELECT *
@@ -690,6 +728,7 @@ def list_devices_for_customer(customer_id: int) -> list[dict]:
                 if row["estimate_amount"] is not None
                 else None
             ),
+            "receipt_available": bool(row["receipt_available"]),
         })
 
     return result
@@ -990,13 +1029,83 @@ def list_recent_repairs_for_pos(limit: int = 6) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def checkout_repair(repair_request_id: int) -> tuple[str | None, int | None]:
+def search_repairs_for_pos(search: str, page: int, page_size: int) -> dict:
+    """Return a paginated, searchable list of active repairs for the POS."""
+    where_sql = """
+        rr.status IN ('RECEIVED', 'DIAGNOSING', 'REPAIRING', 'COMPLETED')
     """
-    Release the repair and mark the appointment completed.
-    Returns (new_status, customer_id) on success, (None, None) if invalid.
-    """
+    params: dict = {}
+    term = search.strip()
+    if term:
+        where_sql += """
+            AND (
+                rr.repair_number ILIKE :search
+                OR d.computer_name ILIKE :search
+                OR u.first_name ILIKE :search
+                OR u.last_name ILIKE :search
+                OR u.email ILIKE :search
+            )
+        """
+        params["search"] = f"%{term}%"
+
+    offset = (page - 1) * page_size
     with Session(engine) as s:
-        req = s.get(Repair_Requests, repair_request_id)
+        total = s.execute(text(f"""
+            SELECT COUNT(*)
+            FROM repair_requests rr
+            JOIN devices d ON d.id = rr.device_id
+            JOIN users u ON u.id = rr.customer_id
+            WHERE {where_sql}
+        """), params).scalar_one()
+
+        rows = s.execute(text(f"""
+            SELECT
+                rr.id,
+                rr.repair_number,
+                rr.status,
+                d.computer_name,
+                u.first_name,
+                u.last_name,
+                u.email
+            FROM repair_requests rr
+            JOIN devices d ON d.id = rr.device_id
+            JOIN users u ON u.id = rr.customer_id
+            WHERE {where_sql}
+            ORDER BY rr.updated_at DESC NULLS LAST, rr.created_at DESC, rr.id DESC
+            LIMIT :limit OFFSET :offset
+        """), {
+            **params,
+            "limit": page_size,
+            "offset": offset,
+        }).mappings().all()
+
+    items = []
+    for row in rows:
+        items.append({
+            "id": row["id"],
+            "repair_number": row["repair_number"],
+            "status": row["status"],
+            "computer_name": row["computer_name"],
+            "customer_name": _person_name(
+                row["first_name"], row["last_name"], row["email"]
+            ),
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+def checkout_repair(
+    repair_request_id: int,
+    processed_by: int,
+) -> tuple[str | None, int | None]:
+    """Record the cash payment, release the repair, and complete its appointment."""
+    with Session(engine) as s:
+        req = s.get(Repair_Requests, repair_request_id, with_for_update=True)
         if req is None:
             return None, None
 
@@ -1006,9 +1115,39 @@ def checkout_repair(repair_request_id: int) -> tuple[str | None, int | None]:
         if req.status.value not in ("COMPLETED", "REPAIRING"):
             return None, None
 
+        repair = s.exec(
+            select(Repairs).where(Repairs.repair_request_id == repair_request_id)
+        ).first()
+        if repair is None:
+            return None, None
+
+        total = repair.final_amount
+        if total is None and repair.estimate_amount is not None:
+            total = Decimal(str(repair.estimate_amount))
+        if total is None or total <= 0:
+            return None, None
+        if repair.final_amount is None:
+            repair.final_amount = Decimal(str(total))
+
+        now = _now()
+        payment = s.exec(
+            select(Payments)
+            .where(Payments.repair_id == repair.id)
+            .where(Payments.status == PaymentStatus.PAID)
+        ).first()
+        if payment is None:
+            s.add(Payments(
+                repair_id=repair.id,
+                amount=Decimal(str(total)),
+                payment_method=PaymentMethod.CASH,
+                status=PaymentStatus.PAID,
+                processed_by=processed_by,
+                paid_at=now,
+                created_at=now,
+            ))
+
         req.status = RepairRequestStatus.RELEASED
-        req.updated_at = _now()
-        s.commit()
+        req.updated_at = now
 
         s.execute(
             text("""
@@ -1016,8 +1155,93 @@ def checkout_repair(repair_request_id: int) -> tuple[str | None, int | None]:
                 SET status = 'COMPLETED', updated_at = :now
                 WHERE repair_request_id = :rid AND status != 'COMPLETED'
             """),
-            {"now": _now(), "rid": repair_request_id},
+            {"now": now, "rid": repair_request_id},
         )
         s.commit()
 
         return "RELEASED", req.customer_id
+
+
+def get_repair_receipt_data(repair_request_id: int) -> dict | None:
+    """Return a paid repair and its customer details for the receipt PDF."""
+    with Session(engine) as s:
+        row = s.execute(text("""
+            SELECT
+                p.id AS payment_id,
+                p.amount,
+                p.payment_method,
+                p.paid_at,
+                rr.id AS repair_request_id,
+                rr.repair_number,
+                rr.requested_service,
+                rr.reported_problem,
+                d.computer_name,
+                d.computer_type,
+                d.serial_number,
+                u.id AS customer_id,
+                u.first_name AS customer_first,
+                u.last_name AS customer_last,
+                u.email AS customer_email,
+                cashier.first_name AS cashier_first,
+                cashier.last_name AS cashier_last
+            FROM repair_requests rr
+            JOIN repairs r ON r.repair_request_id = rr.id
+            JOIN payments p ON p.repair_id = r.id AND p.status = 'PAID'
+            JOIN devices d ON d.id = rr.device_id
+            JOIN users u ON u.id = rr.customer_id
+            JOIN users cashier ON cashier.id = p.processed_by
+            WHERE rr.id = :repair_request_id
+            ORDER BY COALESCE(p.paid_at, p.created_at) DESC, p.id DESC
+            LIMIT 1
+        """), {"repair_request_id": repair_request_id}).mappings().first()
+
+    if row is None:
+        return None
+
+    result = dict(row)
+    result["customer_name"] = _person_name(
+        row["customer_first"], row["customer_last"], row["customer_email"]
+    )
+    result["cashier_name"] = _person_name(
+        row["cashier_first"], row["cashier_last"], "Compair staff"
+    )
+    return result
+
+
+def get_repair_receipt_access(repair_request_id: int) -> dict | None:
+    """Return the receipt path and owner without loading PDF contents."""
+    with Session(engine) as s:
+        row = s.execute(text("""
+            SELECT p.receipt_path, rr.customer_id
+            FROM repair_requests rr
+            JOIN repairs r ON r.repair_request_id = rr.id
+            JOIN payments p ON p.repair_id = r.id AND p.status = 'PAID'
+            WHERE rr.id = :repair_request_id
+            ORDER BY COALESCE(p.paid_at, p.created_at) DESC, p.id DESC
+            LIMIT 1
+        """), {"repair_request_id": repair_request_id}).mappings().first()
+
+    return dict(row) if row is not None else None
+
+
+def set_repair_receipt_path(repair_request_id: int, receipt_path: str) -> bool:
+    """Persist the receipt's backend-relative path on its latest paid payment."""
+    with Session(engine) as s:
+        result = s.execute(text("""
+            UPDATE payments
+            SET receipt_path = :receipt_path
+            WHERE id = (
+                SELECT p.id
+                FROM payments p
+                JOIN repairs r ON r.id = p.repair_id
+                WHERE r.repair_request_id = :repair_request_id
+                  AND p.status = 'PAID'
+                ORDER BY COALESCE(p.paid_at, p.created_at) DESC, p.id DESC
+                LIMIT 1
+            )
+        """), {
+            "repair_request_id": repair_request_id,
+            "receipt_path": receipt_path,
+        })
+        s.commit()
+        return result.rowcount > 0

@@ -1,11 +1,22 @@
 from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 
 from src.models.users import UserRole
 from src.schemas.administration import GetUsers
 from src.security.auth import check_user_role
+from src.services.activity_log import list_activity_logs, record_activity
 from src.services.auth import get_current_user_id
+from src.services.database_backups import (
+    BackupManagerError,
+    archive_snapshot,
+    create_snapshot,
+    get_snapshot_file,
+    list_snapshots,
+    restore_snapshot,
+)
 from src.sql import administration as admin_sql
 from src.sql import auth as auth_sql
 from src.sql import conversation as conversation_sql
@@ -13,6 +24,127 @@ from src.sql import conversation as conversation_sql
 router = APIRouter()
 
 AUTHORIZED_ROLE = [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+
+
+class CreateSnapshotRequest(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+
+
+def _snapshot_error_response(error: BackupManagerError) -> HTTPException:
+    return HTTPException(status_code=error.status_code, detail=str(error))
+
+
+def _snapshot_actor(user_id: int | None) -> dict | None:
+    identity = admin_sql.get_user_identity(user_id) if user_id is not None else None
+    if identity is None:
+        return None
+    state = admin_sql.get_user_state(user_id) # type: ignore
+    return {
+        "id": user_id,
+        "name": " ".join(
+            part for part in (identity.get("first_name") or "", identity.get("last_name") or "")
+            if part
+        ).strip() or identity["email"],
+        "email": identity["email"],
+        "role": state[0] if state else None,
+    }
+
+
+@router.get("/backups")
+def get_database_snapshots(request: Request, response: Response):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="Only administrators can view database snapshots")
+    try:
+        return {"items": list_snapshots()}
+    except BackupManagerError as error:
+        raise _snapshot_error_response(error) from error
+
+
+@router.post("/backups")
+def create_database_snapshot(
+    body: CreateSnapshotRequest,
+    request: Request,
+    response: Response,
+):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="Only administrators can create database snapshots")
+    user_id = get_current_user_id(request)
+    label = " ".join(body.label.split())
+    if not label:
+        raise HTTPException(status_code=422, detail="Snapshot name is required")
+    try:
+        snapshot = create_snapshot(label, _snapshot_actor(user_id))
+    except BackupManagerError as error:
+        raise _snapshot_error_response(error) from error
+    record_activity(
+        user_id, "DATABASE_SNAPSHOT_CREATED", f"Created database snapshot “{label}”.",
+        target_type="database_snapshot", target_id=snapshot["id"],
+        details={"size_bytes": snapshot["size_bytes"], "kind": snapshot["kind"]},
+    )
+    return snapshot
+
+
+@router.get("/backups/{snapshot_id}/download")
+def download_database_snapshot(snapshot_id: str, request: Request, response: Response):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="Only administrators can download database snapshots")
+    try:
+        dump_path, _manifest = get_snapshot_file(snapshot_id)
+    except BackupManagerError as error:
+        raise _snapshot_error_response(error) from error
+    return FileResponse(
+        dump_path,
+        media_type="application/octet-stream",
+        filename=f"{snapshot_id}.dump",
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+@router.post("/backups/{snapshot_id}/archive")
+def archive_database_snapshot(snapshot_id: str, request: Request, response: Response):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="Only administrators can archive database snapshots")
+    user_id = get_current_user_id(request)
+    actor = _snapshot_actor(user_id)
+    try:
+        snapshot = archive_snapshot(snapshot_id, actor)
+    except BackupManagerError as error:
+        raise _snapshot_error_response(error) from error
+    record_activity(
+        user_id,
+        "DATABASE_SNAPSHOT_ARCHIVED",
+        f"Archived database snapshot “{snapshot.get('label') or snapshot_id}”.",
+        target_type="database_snapshot",
+        target_id=snapshot_id,
+        actor_snapshot=actor,
+    )
+    return {"message": "Snapshot archived. Its dump is retained and can still be restored or downloaded.", "snapshot": snapshot}
+
+
+@router.post("/backups/{snapshot_id}/restore")
+def restore_database_snapshot(snapshot_id: str, request: Request, response: Response):
+    if not check_user_role(request, response, [UserRole.SUPER_ADMIN]):
+        raise HTTPException(status_code=403, detail="Only super admins can restore database snapshots")
+    user_id = get_current_user_id(request)
+    actor = _snapshot_actor(user_id)
+    try:
+        result = restore_snapshot(snapshot_id, actor)
+    except BackupManagerError as error:
+        raise _snapshot_error_response(error) from error
+    record_activity(
+        user_id,
+        "DATABASE_SNAPSHOT_RESTORED",
+        f"Restored database snapshot “{result['snapshot'].get('label') or snapshot_id}”.",
+        target_type="database_snapshot",
+        target_id=snapshot_id,
+        details={"safety_snapshot_id": result["safety_snapshot"]["id"]},
+        actor_snapshot=actor,
+    )
+    return {
+        "message": "Database snapshot restored. A pre-restore safety snapshot was created.",
+        "snapshot": result["snapshot"],
+        "safety_snapshot": result["safety_snapshot"],
+    }
 
 
 @router.get("/get-users")
@@ -85,6 +217,19 @@ def get_customers(
     return admin_sql.get_customers(page, page_size, search)
 
 
+@router.get("/activity-logs")
+def get_activity_logs(
+    request: Request,
+    response: Response,
+    search: str = Query("", max_length=200),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="Only administrators can view activity logs")
+    return list_activity_logs(search, page_size, (page - 1) * page_size)
+
+
 @router.post("/set-user-active")
 def set_user_active(
     request: Request,
@@ -124,7 +269,19 @@ def set_user_active(
                 detail="Cannot suspend the last remaining active super admin",
             )
 
-    return admin_sql.set_user_active(user_id, is_active)
+    target = admin_sql.get_user_identity(user_id)
+    updated = admin_sql.set_user_active(user_id, is_active)
+    if updated:
+        label = " ".join(part for part in ((target or {}).get("first_name") or "", (target or {}).get("last_name") or "") if part).strip()
+        record_activity(
+            current_user_id,
+            "ACCOUNT_SUSPENDED" if not is_active else "ACCOUNT_REACTIVATED",
+            f"{'Suspended' if not is_active else 'Reactivated'} account {label or 'account'} ({(target or {}).get('email', user_id)}).",
+            target_type="account",
+            target_id=user_id,
+            details={"is_active": is_active},
+        )
+    return updated
 
 
 @router.get("/archive/messages")
@@ -158,6 +315,10 @@ def archive_message_conversation(
         )
     if not conversation_sql.archive_conversation(conversation_id):
         raise HTTPException(status_code=409, detail="Conversation changed before it could be archived")
+    record_activity(
+        get_current_user_id(request), "CONVERSATION_ARCHIVED",
+        f"Archived conversation {conversation_id}.", target_type="conversation", target_id=conversation_id,
+    )
     return {"message": "Conversation archived."}
 
 
@@ -171,6 +332,10 @@ def restore_message_conversation(
         raise HTTPException(status_code=403, detail="You do not have permission to restore messages")
     if not conversation_sql.restore_conversation(conversation_id):
         raise HTTPException(status_code=404, detail="Archived conversation not found")
+    record_activity(
+        get_current_user_id(request), "CONVERSATION_RESTORED",
+        f"Restored conversation {conversation_id}.", target_type="conversation", target_id=conversation_id,
+    )
     return {"message": "Conversation restored."}
 
 
@@ -205,8 +370,13 @@ def archive_account(user_id: int, request: Request, response: Response):
         and admin_sql.count_active_super_admins() <= 1
     ):
         raise HTTPException(status_code=400, detail="Cannot archive the last active super admin")
+    target = admin_sql.get_user_identity(user_id)
     if not admin_sql.archive_user(user_id):
         raise HTTPException(status_code=404, detail="Account not found or already archived")
+    record_activity(
+        get_current_user_id(request), "ACCOUNT_ARCHIVED",
+        f"Archived account {(target or {}).get('email', user_id)}.", target_type="account", target_id=user_id,
+    )
     return {"message": "Account archived."}
 
 
@@ -214,8 +384,13 @@ def archive_account(user_id: int, request: Request, response: Response):
 def restore_account(user_id: int, request: Request, response: Response):
     if not check_user_role(request, response, [UserRole.SUPER_ADMIN]):
         raise HTTPException(status_code=403, detail="Only super admins can restore accounts")
+    target = admin_sql.get_user_identity(user_id)
     if not admin_sql.restore_user(user_id):
         raise HTTPException(status_code=404, detail="Archived account not found")
+    record_activity(
+        get_current_user_id(request), "ACCOUNT_RESTORED",
+        f"Restored account {(target or {}).get('email', user_id)}.", target_type="account", target_id=user_id,
+    )
     return {"message": "Account restored."}
 
 
@@ -276,11 +451,30 @@ def edit_user(
                 detail="Cannot demote the last remaining active super admin",
             )
 
+    previous_user = auth_sql.get_user_by_id(user.id)
     if not admin_sql.edit_user(user):
         raise HTTPException(
             status_code=400,
             detail="failed to edit user",
         )
+    changed = {}
+    if previous_user:
+        for key, before, after in (
+            ("first_name", previous_user.first_name, user.first_name),
+            ("last_name", previous_user.last_name, user.last_name),
+            ("email", previous_user.email, user.email),
+            ("role", previous_user.role.value, user.role),
+        ):
+            if before != after:
+                changed[key] = {"from": before, "to": after}
+    target_name = " ".join(part for part in (user.first_name or "", user.last_name or "") if part).strip() or user.email
+    description = f"Updated account {target_name}."
+    if "first_name" in changed or "last_name" in changed:
+        description = f"Changed account name to {target_name}."
+    record_activity(
+        current_user_id, "ACCOUNT_UPDATED", description,
+        target_type="account", target_id=user.id, details=changed,
+    )
     return "ok"
 
 
@@ -300,4 +494,10 @@ def reset_user_password(
     if not raw_password:
         raise HTTPException(status_code=400, detail="Failed to reset password")
 
+    target = auth_sql.get_user_by_id(user_id)
+    record_activity(
+        get_current_user_id(request), "PASSWORD_RESET_BY_ADMIN",
+        f"Reset the password for {target.email if target else f'account {user_id}'}.",
+        target_type="account", target_id=user_id,
+    )
     return {"password": raw_password}

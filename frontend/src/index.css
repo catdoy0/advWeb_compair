@@ -16,6 +16,21 @@
 html {
   /* font-size: 18px !important; */
   scroll-behavior: smooth;
+  min-height: 100%;
+  background: #fff;
+}
+
+html.dark {
+  background: #0b1a2e;
+}
+
+body {
+  min-height: 100dvh;
+  background: #fff;
+}
+
+html.dark body {
+  background: #0b1a2e;
 }
 
 *::-webkit-scrollbar {
@@ -71,4 +86,18 @@ html {
 }
 .animate-slide-in-right {
   animation: slide-in-right 220ms ease-out;
+}
+
+::view-transition-image-pair(root) {
+  isolation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(root) {
+  z-index: 1;
 }

@@ -12,7 +12,7 @@ export const ROUTES = {
     ADMINISTRATION: "administration",
     SETTINGS: "settings",
     ARCHIVE: "archive",
-
+    ACTIVITY_LOGS: "activity-logs",
     WORKSPACE: "workspace",
     REPAIR_QUEUE: "repair-queue",
     PARTS_INVENTORY: "parts-inventory",

@@ -22,7 +22,7 @@ export default function BackendStatusBanner() {
   }
 
   return (
-    <div className="relative z-[100]">
+    <div className="fixed inset-x-0 top-0 z-[100]">
       <CommonTopBanner variant="info">
         Unable to connect to server.
       </CommonTopBanner>

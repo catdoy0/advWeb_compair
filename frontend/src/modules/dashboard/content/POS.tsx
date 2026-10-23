@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { ArrowRight, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import dayjs from "dayjs";
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
@@ -11,10 +12,13 @@ import DashboardPanel from "../components/DashboardPanel";
 import {
   checkoutRepair,
   getRepairByNumber,
-  listPosRecent,
+  searchPosRepairs,
 } from "../../../api/repair_requests";
 import type { RepairDetail } from "../../../types/repair_requests";
-import type { POSRecentRepair } from "../../../api/repair_requests";
+import type { POSRepairSearchResult } from "../../../api/repair_requests";
+
+const POS_PAGE_SIZE = 6;
+const SEARCH_DEBOUNCE_MS = 400;
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300",
@@ -57,86 +61,135 @@ function formatDue(date: string | null, time: string | null): string {
   return `${d.format("MMM D")}, ${t}`;
 }
 
+function downloadReceipt(blob: Blob, repairNumber: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${repairNumber}_receipt.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 export default function POS() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const [recent, setRecent] = useState<POSRecentRepair[]>([]);
+  const [repairs, setRepairs] = useState<POSRepairSearchResult[]>([]);
+  const [repairCount, setRepairCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [resultsPage, setResultsPage] = useState(1);
   const [selected, setSelected] = useState<RepairDetail | null>(null);
-  const [lookingUp, setLookingUp] = useState(false);
+  const [lookingUp, setLookingUp] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
+  const searchRequestSequence = useRef(0);
+  const lastSearchTerm = useRef("");
+  const [completedSearchTerm, setCompletedSearchTerm] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState("");
+  const [refreshTick, setRefreshTick] = useState(0);
+  const resultsMatchQuery = completedSearchTerm === query.trim();
 
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [messageModalMessage, setMessageModalMessage] = useState("");
 
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const data = await listPosRecent();
-      if (cancelled) return;
-      setRecent(data);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function refreshRecent() {
-    const data = await listPosRecent();
-    setRecent(data);
-  }
-
-  async function handleLookup() {
     const trimmed = query.trim();
-    if (!trimmed) return;
+    const requestId = ++searchRequestSequence.current;
+    const searchChanged = lastSearchTerm.current !== trimmed;
+    lastSearchTerm.current = trimmed;
+    const debounceDelay = searchChanged && trimmed ? SEARCH_DEBOUNCE_MS : 0;
 
-    setLookingUp(true);
-    try {
-      const data = await getRepairByNumber(trimmed);
-      if (data === null) {
-        setMessageModalMessage(`No repair found for "${trimmed}".`);
-        setMessageModalOpen(true);
-        return;
+    const timeout = window.setTimeout(async () => {
+      if (requestId !== searchRequestSequence.current) return;
+      setLookingUp(true);
+      try {
+        const result = await searchPosRepairs(trimmed, page, POS_PAGE_SIZE);
+        if (requestId !== searchRequestSequence.current) return;
+        setRepairs(result.items);
+        setRepairCount(result.total);
+        setResultsPage(page);
+        setCompletedSearchTerm(trimmed);
+        setSearchError("");
+        const lastPage = Math.max(1, Math.ceil(result.total / POS_PAGE_SIZE));
+        if (page > lastPage) setPage(lastPage);
+      } catch {
+        if (requestId === searchRequestSequence.current) {
+          setSearchError("Unable to search repairs. Please try again.");
+        }
+      } finally {
+        if (requestId === searchRequestSequence.current) setLookingUp(false);
       }
-      setSelected(data);
-      setQuery("");
-    } finally {
-      setLookingUp(false);
-    }
-  }
+    }, debounceDelay);
+
+    return () => window.clearTimeout(timeout);
+  }, [query, page, refreshTick]);
 
   async function handleQuickPick(repairNumber: string) {
+    const requestId = ++searchRequestSequence.current;
     setLookingUp(true);
     try {
       const data = await getRepairByNumber(repairNumber);
+      if (requestId !== searchRequestSequence.current) return;
       if (data === null) {
-        setMessageModalMessage(`Could not load ${repairNumber}.`);
-        setMessageModalOpen(true);
+        setSearchError(`Could not load ${repairNumber}. Try selecting it again.`);
         return;
       }
       setSelected(data);
+    } catch {
+      if (requestId === searchRequestSequence.current) {
+        setSearchError(`Unable to load ${repairNumber}. Please try again.`);
+      }
     } finally {
-      setLookingUp(false);
+      if (requestId === searchRequestSequence.current) setLookingUp(false);
     }
   }
 
   function handleRemove() {
+    searchRequestSequence.current += 1;
+    setLookingUp(false);
     setSelected(null);
     setQuery("");
+  }
+
+  function handleQueryChange(value: string) {
+    searchRequestSequence.current += 1;
+    setLookingUp(false);
+    setSearchError("");
+    setSelected(null);
+    setPage(1);
+    setQuery(value.toUpperCase());
+  }
+
+  function handleGoToRepairDetail() {
+    if (!selected) return;
+    navigate(`/dashboard/repair-queue?id=${selected.id}`);
   }
 
   async function handleCheckout() {
     if (!selected) return;
 
+    const amount = selected.final_amount ?? selected.estimate_amount;
+    if (amount === null || amount <= 0) {
+      setMessageModalMessage("Add a repair total before checking out.");
+      setMessageModalOpen(true);
+      return;
+    }
+
     setCheckingOut(true);
     try {
       const result = await checkoutRepair(selected.id);
-      setMessageModalMessage(result.message);
-      setMessageModalOpen(true);
 
       if (result.ok) {
         setSelected({ ...selected, status: "RELEASED" });
-        refreshRecent();
+        if (result.receipt) downloadReceipt(result.receipt, selected.repair_number);
+        setRefreshTick((tick) => tick + 1);
       }
+      setMessageModalMessage(result.message);
+      setMessageModalOpen(true);
+    } catch {
+      setMessageModalMessage("Unable to complete checkout. Please try again.");
+      setMessageModalOpen(true);
     } finally {
       setCheckingOut(false);
     }
@@ -178,45 +231,83 @@ export default function POS() {
               <input
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value.toUpperCase())}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleLookup();
-                }}
+                onChange={(e) => handleQueryChange(e.target.value)}
                 placeholder="e.g. CP-1042"
                 className="h-11 w-full rounded-md border border-[#cfd9e8] bg-white pl-9 pr-3 font-mono text-[12px] text-[#102c50] outline-none placeholder:font-sans placeholder:text-slate-400 focus:border-[#2870e8] dark:border-slate-600 dark:bg-[#182536] dark:text-white"
               />
             </div>
             <p className="mt-2 text-[10px] text-slate-400">
-              Use the ID printed on the repair intake or customer message.
+              Search by repair ID, customer, or device.
             </p>
 
-            {/* Quick picks */}
-            {recent.length > 0 && (
+            {searchError && (
+              <p className="mt-5 text-[10px] text-red-500 dark:text-red-300">
+                {searchError}
+              </p>
+            )}
+            {repairs.length > 0 ? (
               <div className="mt-5 grid grid-cols-2 gap-2">
-                {recent.map((r) => (
+                {repairs.map((repair) => (
                   <button
-                    key={r.id}
+                    key={repair.id}
                     type="button"
-                    onClick={() => handleQuickPick(r.repair_number)}
-                    disabled={lookingUp}
+                    onClick={() => handleQuickPick(repair.repair_number)}
+                    disabled={lookingUp || !resultsMatchQuery}
                     className="rounded-md border border-[#d8e0eb] bg-white px-3 py-2.5 text-[12px] font-bold text-[#102c50] transition-colors hover:border-[#2870e8] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-[#182536] dark:text-white dark:hover:bg-[#1c2c3f]"
                   >
-                    {r.repair_number}
+                    <span className="block">{repair.repair_number}</span>
+                    <span className="mt-1 block truncate text-left text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                      {repair.customer_name} · {repair.computer_name}
+                    </span>
                   </button>
                 ))}
               </div>
-            )}
+            ) : lookingUp ? (
+              <p className="mt-5 text-center text-[10px] text-slate-400">
+                Searching repairs...
+              </p>
+            ) : resultsMatchQuery && !searchError ? (
+              <p className="mt-5 text-center text-[10px] text-slate-400">
+                {query.trim()
+                  ? `No active repairs match “${query.trim()}”.`
+                  : "No active repairs found."}
+              </p>
+            ) : null}
 
-            <div className="mt-5 flex justify-end">
-              <CommonButton
-                onClick={handleLookup}
-                disabled={lookingUp || query.trim().length === 0}
-                className="flex items-center gap-2 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {lookingUp ? "Looking up..." : "Look up repair"}
-                {!lookingUp && <ArrowRight size={13} />}
-              </CommonButton>
-            </div>
+              <div className="mt-4 flex items-center justify-between">
+                <p className="text-[10px] text-slate-400">
+                  Showing {(resultsPage - 1) * POS_PAGE_SIZE + 1}–
+                  {Math.min(resultsPage * POS_PAGE_SIZE, repairCount)} of {repairCount}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Previous page"
+                    disabled={!resultsMatchQuery || lookingUp || resultsPage <= 1}
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    className="rounded p-1.5 text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-700"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="min-w-10 text-center text-[10px] text-slate-500 dark:text-slate-400">
+                    {resultsPage} / {Math.ceil(repairCount / POS_PAGE_SIZE)}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Next page"
+                    disabled={
+                      !resultsMatchQuery ||
+                      lookingUp ||
+                      resultsPage >= Math.ceil(repairCount / POS_PAGE_SIZE)
+                    }
+                    onClick={() => setPage((current) => current + 1)}
+                    className="rounded p-1.5 text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-700"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+
           </div>
         </DashboardPanel>
 
@@ -301,25 +392,36 @@ export default function POS() {
                 </div>
 
                 {/* Actions */}
-                <div className="mt-6 flex justify-end gap-2">
-                  <CommonButton
-                    onClick={handleRemove}
-                    className="bg-[#c0392b] px-4 py-2 hover:bg-[#a83226]"
-                  >
-                    Remove item
-                  </CommonButton>
+                <div className="mt-6 flex justify-between gap-2">
 
                   <CommonButton
-                    onClick={handleCheckout}
-                    disabled={
-                      checkingOut ||
-                      selected.status === "RELEASED" ||
-                      !["COMPLETED", "REPAIRING"].includes(selected.status)
-                    }
-                    className="bg-[#15946a] px-4 py-2 hover:bg-[#0f7a55] disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={handleGoToRepairDetail}
                   >
-                    {checkingOut ? "Checking out..." : "Check out"}
+                    Go to repair detail
                   </CommonButton>
+
+                  <div className="flex gap-2">
+                    <CommonButton
+                      onClick={handleRemove}
+                      className="bg-[#c0392b] px-4 py-2 hover:bg-[#a83226]"
+                    >
+                      Remove item
+                    </CommonButton>
+
+                    <CommonButton
+                      onClick={handleCheckout}
+                      disabled={
+                        checkingOut ||
+                          selected.status === "RELEASED" ||
+                          total === null ||
+                          total <= 0 ||
+                          !["COMPLETED", "REPAIRING"].includes(selected.status)
+                      }
+                      className="bg-[#15946a] px-4 py-2 hover:bg-[#0f7a55] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {checkingOut ? "Checking out..." : "Check out"}
+                    </CommonButton>
+                  </div>
                 </div>
               </>
             ) : (

@@ -29,6 +29,21 @@ export async function changeEmail(
   return { ok: true, message: await readMessage(res, "Email changed.") };
 }
 
+export async function changeName(payload: { firstName: string; lastName: string }): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_URL}/${PROFILE}/change-name`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    return { ok: false, message: await readMessage(res, "Failed to update your name.") };
+  }
+
+  return { ok: true, message: await readMessage(res, "Name updated.") };
+}
+
 export async function changePassword(
   payload: ChangePasswordRequest,
 ): Promise<{ ok: boolean; message: string }> {
@@ -44,4 +59,20 @@ export async function changePassword(
   }
 
   return { ok: true, message: await readMessage(res, "Password changed.") };
+}
+
+export async function uploadAvatar(file: File): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_URL}/${PROFILE}/avatar`, {
+    method: "PUT",
+    credentials: "include",
+    headers: {
+      "Content-Type": file.type,
+      "X-Avatar-Filename": encodeURIComponent(file.name),
+    },
+    body: file,
+  });
+  if (!res.ok) {
+    return { ok: false, message: await readMessage(res, "Failed to upload profile picture.") };
+  }
+  return { ok: true, message: "Profile picture updated." };
 }

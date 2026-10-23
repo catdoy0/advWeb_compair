@@ -6,6 +6,7 @@ interface DashboardSidebarProps {
   role: Role
   activeHref: string
   userInitials: string
+  avatarUrl?: string | null
   userName: string
   unreadMessages: number
   open: boolean;
@@ -17,6 +18,7 @@ export default function DashboardSidebar({
   role,
   activeHref,
   userInitials,
+  avatarUrl,
   userName,
   unreadMessages,
   onClose,
@@ -34,6 +36,7 @@ export default function DashboardSidebar({
       activeHref={activeHref}
       user={{
         initials: userInitials,
+        avatarUrl,
         name: userName,
         role: role
       }}
