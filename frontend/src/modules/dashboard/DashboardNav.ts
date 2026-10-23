@@ -82,7 +82,7 @@ const adminSections: DashboardSidebarSection[] = [
   },
   {
     label: "Manage",
-    items: [techniciansItem, staffItem, reportsItem, activityLogsItem, settingsItem, profileItem],
+    items: [administrationItem, techniciansItem, staffItem, reportsItem, activityLogsItem, settingsItem, profileItem],
   },
   // { label: "System", items: [archiveItem] },
 ];

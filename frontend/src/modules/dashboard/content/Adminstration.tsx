@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, Download, RotateCcw, Search } from "lucide-react";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
 import DataTable, { type DataTableColumn } from "../../../components/common/widgets/DataTable";
@@ -13,6 +14,7 @@ import AccountActions from "./administration/AccountActions";
 import AccountFilterButton from "./administration/AccountFilterButton";
 import SummaryCard from "./administration/SummaryCard";
 import EditAccountModal from "./administration/EditAccountModal";
+import DatabaseBackups from "./DatabaseBackups";
 import type { Account } from "./administration/types";
 import { useAccountsAdmin } from "../../../hooks/administration";
 
@@ -79,6 +81,7 @@ account.status === "Active"
 
 export default function Adminstration() {
   const admin = useAccountsAdmin();
+  const [snapshotCount, setSnapshotCount] = useState(0);
 
   const columns = accountColumns(
     admin.handleEditClick,
@@ -147,10 +150,9 @@ export default function Adminstration() {
         />
 
         <SummaryCard
-          label="Latest backup"
-          value="None"
-          detail="Create a recoverable workspace copy"
-          valueText
+          label="Database snapshots"
+          value={snapshotCount}
+          detail="saved database backups"
         />
       </div>
 
@@ -249,43 +251,7 @@ export default function Adminstration() {
         </div>
       </DashboardPanel>
 
-      <DashboardPanel
-        className="mt-8"
-        title="Workspace backups"
-        description="Create a point-in-time copy before major changes."
-        headerClassName="flex-col items-start px-5 py-3 sm:flex-row sm:items-center sm:justify-between"
-        headerAction={
-          <div className="flex gap-2">
-            <CommonButton
-              variant="outline"
-              className="flex items-center gap-2 border-[#d4ddea] px-4 py-2"
-              disabled
-            >
-              <RotateCcw size={14} />
-              Restore backup
-            </CommonButton>
-
-            <CommonButton className="flex items-center gap-2 px-4 py-2">
-              <Download size={14} />
-              Create backup
-            </CommonButton>
-          </div>
-        }
-      >
-        <div className="flex min-h-[210px] flex-col items-center justify-center text-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#eef4ff] text-[#2870e8]">
-            <Download size={16} />
-          </div>
-
-          <h3 className="mt-4 text-[14px] font-bold text-[#102c50] dark:text-white">
-            No backups yet
-          </h3>
-
-          <p className="mt-1 text-[11px] text-slate-400">
-            Create one before changing account access or inventory.
-          </p>
-        </div>
-      </DashboardPanel>
+      <DatabaseBackups onSnapshotCountChange={setSnapshotCount} />
     </DashboardPage>
   );
 }

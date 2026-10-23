@@ -18,12 +18,13 @@ def record_activity(
     target_type: str | None = None,
     target_id: str | int | None = None,
     details: dict[str, Any] | None = None,
+    actor_snapshot: dict[str, Any] | None = None,
 ) -> None:
     """Persist a human-readable audit entry without making the user action fail on log errors."""
     try:
         with Session(engine) as session:
-            actor = None
-            if actor_id is not None:
+            actor = actor_snapshot
+            if actor is None and actor_id is not None:
                 actor = session.execute(
                     text("SELECT first_name, last_name, email, role FROM users WHERE id = :id"),
                     {"id": actor_id},
@@ -33,12 +34,13 @@ def record_activity(
             actor_email = None
             actor_role = None
             if actor:
-                actor_name = " ".join(
-                    part for part in (actor["first_name"] or "", actor["last_name"] or "")
+                actor_name = actor.get("name") or " ".join(
+                    part for part in (actor.get("first_name") or "", actor.get("last_name") or "")
                     if part
-                ).strip() or actor["email"]
-                actor_email = actor["email"]
-                actor_role = actor["role"].value if hasattr(actor["role"], "value") else str(actor["role"])
+                ).strip() or actor.get("email") or actor_name
+                actor_email = actor.get("email")
+                role = actor.get("role")
+                actor_role = role.value if hasattr(role, "value") else str(role) if role else None
 
             session.execute(
                 text("""

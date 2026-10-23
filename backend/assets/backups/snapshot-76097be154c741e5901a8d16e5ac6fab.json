@@ -1,0 +1,15 @@
+{
+  "id": "76097be154c741e5901a8d16e5ac6fab",
+  "label": "Snapshot test",
+  "kind": "manual",
+  "created_at": "2026-10-23T16:37:34.029759+00:00",
+  "created_by": {
+    "id": 5,
+    "name": "root",
+    "email": "compair@gmail.com",
+    "role": "SUPER_ADMIN"
+  },
+  "size_bytes": 69119,
+  "sha256": "6a4de1c5d52bc53a55d9a6ccaf1abfd469688dc220c5a930cbaeba2c4b19e92d",
+  "format": "PostgreSQL custom dump"
+}

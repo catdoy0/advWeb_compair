@@ -1,12 +1,22 @@
 from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 
 from src.models.users import UserRole
 from src.schemas.administration import GetUsers
 from src.security.auth import check_user_role
-from src.services.auth import get_current_user_id
 from src.services.activity_log import list_activity_logs, record_activity
+from src.services.auth import get_current_user_id
+from src.services.database_backups import (
+    BackupManagerError,
+    archive_snapshot,
+    create_snapshot,
+    get_snapshot_file,
+    list_snapshots,
+    restore_snapshot,
+)
 from src.sql import administration as admin_sql
 from src.sql import auth as auth_sql
 from src.sql import conversation as conversation_sql
@@ -14,6 +24,127 @@ from src.sql import conversation as conversation_sql
 router = APIRouter()
 
 AUTHORIZED_ROLE = [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+
+
+class CreateSnapshotRequest(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+
+
+def _snapshot_error_response(error: BackupManagerError) -> HTTPException:
+    return HTTPException(status_code=error.status_code, detail=str(error))
+
+
+def _snapshot_actor(user_id: int | None) -> dict | None:
+    identity = admin_sql.get_user_identity(user_id) if user_id is not None else None
+    if identity is None:
+        return None
+    state = admin_sql.get_user_state(user_id) # type: ignore
+    return {
+        "id": user_id,
+        "name": " ".join(
+            part for part in (identity.get("first_name") or "", identity.get("last_name") or "")
+            if part
+        ).strip() or identity["email"],
+        "email": identity["email"],
+        "role": state[0] if state else None,
+    }
+
+
+@router.get("/backups")
+def get_database_snapshots(request: Request, response: Response):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="Only administrators can view database snapshots")
+    try:
+        return {"items": list_snapshots()}
+    except BackupManagerError as error:
+        raise _snapshot_error_response(error) from error
+
+
+@router.post("/backups")
+def create_database_snapshot(
+    body: CreateSnapshotRequest,
+    request: Request,
+    response: Response,
+):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="Only administrators can create database snapshots")
+    user_id = get_current_user_id(request)
+    label = " ".join(body.label.split())
+    if not label:
+        raise HTTPException(status_code=422, detail="Snapshot name is required")
+    try:
+        snapshot = create_snapshot(label, _snapshot_actor(user_id))
+    except BackupManagerError as error:
+        raise _snapshot_error_response(error) from error
+    record_activity(
+        user_id, "DATABASE_SNAPSHOT_CREATED", f"Created database snapshot “{label}”.",
+        target_type="database_snapshot", target_id=snapshot["id"],
+        details={"size_bytes": snapshot["size_bytes"], "kind": snapshot["kind"]},
+    )
+    return snapshot
+
+
+@router.get("/backups/{snapshot_id}/download")
+def download_database_snapshot(snapshot_id: str, request: Request, response: Response):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="Only administrators can download database snapshots")
+    try:
+        dump_path, _manifest = get_snapshot_file(snapshot_id)
+    except BackupManagerError as error:
+        raise _snapshot_error_response(error) from error
+    return FileResponse(
+        dump_path,
+        media_type="application/octet-stream",
+        filename=f"{snapshot_id}.dump",
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+@router.post("/backups/{snapshot_id}/archive")
+def archive_database_snapshot(snapshot_id: str, request: Request, response: Response):
+    if not check_user_role(request, response, AUTHORIZED_ROLE):
+        raise HTTPException(status_code=403, detail="Only administrators can archive database snapshots")
+    user_id = get_current_user_id(request)
+    actor = _snapshot_actor(user_id)
+    try:
+        snapshot = archive_snapshot(snapshot_id, actor)
+    except BackupManagerError as error:
+        raise _snapshot_error_response(error) from error
+    record_activity(
+        user_id,
+        "DATABASE_SNAPSHOT_ARCHIVED",
+        f"Archived database snapshot “{snapshot.get('label') or snapshot_id}”.",
+        target_type="database_snapshot",
+        target_id=snapshot_id,
+        actor_snapshot=actor,
+    )
+    return {"message": "Snapshot archived. Its dump is retained and can still be restored or downloaded.", "snapshot": snapshot}
+
+
+@router.post("/backups/{snapshot_id}/restore")
+def restore_database_snapshot(snapshot_id: str, request: Request, response: Response):
+    if not check_user_role(request, response, [UserRole.SUPER_ADMIN]):
+        raise HTTPException(status_code=403, detail="Only super admins can restore database snapshots")
+    user_id = get_current_user_id(request)
+    actor = _snapshot_actor(user_id)
+    try:
+        result = restore_snapshot(snapshot_id, actor)
+    except BackupManagerError as error:
+        raise _snapshot_error_response(error) from error
+    record_activity(
+        user_id,
+        "DATABASE_SNAPSHOT_RESTORED",
+        f"Restored database snapshot “{result['snapshot'].get('label') or snapshot_id}”.",
+        target_type="database_snapshot",
+        target_id=snapshot_id,
+        details={"safety_snapshot_id": result["safety_snapshot"]["id"]},
+        actor_snapshot=actor,
+    )
+    return {
+        "message": "Database snapshot restored. A pre-restore safety snapshot was created.",
+        "snapshot": result["snapshot"],
+        "safety_snapshot": result["safety_snapshot"],
+    }
 
 
 @router.get("/get-users")

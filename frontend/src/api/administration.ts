@@ -23,6 +23,89 @@ export interface ActivityLogEntry {
   created_at: string;
 }
 
+export interface DatabaseSnapshot {
+  id: string;
+  label: string;
+  kind: "manual" | "pre_restore" | string;
+  created_at: string;
+  created_by: { id: number; name: string; email: string } | null;
+  size_bytes: number;
+  sha256: string;
+  format: string;
+  archived_at?: string | null;
+  archived_by?: { id: number; name: string; email: string } | null;
+}
+
+export async function getDatabaseSnapshots(): Promise<{ items: DatabaseSnapshot[] | null; error: string }> {
+  try {
+    const res = await apiFetch(`${ADMINISTRATION}/backups`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { items: null, error: data.detail ?? "Unable to load database snapshots." };
+    }
+    const data = await res.json();
+    return { items: data.items ?? [], error: "" };
+  } catch {
+    return { items: null, error: "Unable to contact the server." };
+  }
+}
+
+export async function createDatabaseSnapshot(label: string): Promise<{
+  snapshot: DatabaseSnapshot | null;
+  error: string;
+}> {
+  try {
+    const res = await apiFetch(`${ADMINISTRATION}/backups`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return res.ok
+      ? { snapshot: data as DatabaseSnapshot, error: "" }
+      : { snapshot: null, error: data.detail ?? "Unable to create snapshot." };
+  } catch {
+    return { snapshot: null, error: "Unable to contact the server." };
+  }
+}
+
+export async function restoreDatabaseSnapshot(id: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await apiFetch(`${ADMINISTRATION}/backups/${encodeURIComponent(id)}/restore`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    return res.ok
+      ? { ok: true, message: data.message ?? "Snapshot restored." }
+      : { ok: false, message: data.detail ?? "Unable to restore snapshot." };
+  } catch {
+    return { ok: false, message: "Unable to contact the server." };
+  }
+}
+
+export async function archiveDatabaseSnapshot(id: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await apiFetch(`${ADMINISTRATION}/backups/${encodeURIComponent(id)}/archive`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    return res.ok
+      ? { ok: true, message: data.message ?? "Snapshot archived." }
+      : { ok: false, message: data.detail ?? "Unable to archive snapshot." };
+  } catch {
+    return { ok: false, message: "Unable to contact the server." };
+  }
+}
+
+export async function downloadDatabaseSnapshot(id: string): Promise<{ blob: Blob | null; error: string }> {
+  try {
+    const res = await apiFetch(`${ADMINISTRATION}/backups/${encodeURIComponent(id)}/download`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { blob: null, error: data.detail ?? "Unable to download snapshot." };
+    }
+    return { blob: await res.blob(), error: "" };
+  } catch {
+    return { blob: null, error: "Unable to contact the server." };
+  }
+}
+
 export async function getActivityLogs(
   search: string,
   page: number,
