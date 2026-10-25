@@ -560,8 +560,25 @@ def add_repair_part(
         work_note=body.work_note,
     )
 
-    if error:
-        raise HTTPException(status_code=400, detail=error)
+    if error or row is None:
+        raise HTTPException(status_code=400, detail=error or "Could not add part to repair")
+
+    repair_detail = rr_sql.get_repair_detail(repair_request_id)
+    repair_number = repair_detail["repair_number"] if repair_detail else str(repair_request_id)
+    record_activity(
+        user.id,
+        "PART_USED_FOR_REPAIR",
+        f"Used {body.quantity_used} {row['part_name']} ({row['part_sku']}) for repair {repair_number}.",
+        target_type="part",
+        target_id=row["part_id"],
+        details={
+            "part_id": row["part_id"],
+            "sku": row["part_sku"],
+            "quantity_used": body.quantity_used,
+            "repair_request_id": repair_request_id,
+            "repair_number": repair_number,
+        },
+    )
 
     return row
 
@@ -576,9 +593,24 @@ def remove_repair_part(
     if user.role == UserRole.CUSTOMER:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    ok = rp_sql.remove_part_from_repair(repair_part_id)
-    if not ok:
+    removed = rp_sql.remove_part_from_repair(repair_part_id)
+    if removed is None:
         raise HTTPException(status_code=404, detail="Part usage not found")
+
+    repair_detail = rr_sql.get_repair_detail(repair_request_id)
+    repair_number = repair_detail["repair_number"] if repair_detail else str(repair_request_id)
+    record_activity(
+        user.id,
+        "PART_USAGE_REVERSED",
+        f"Removed {removed['quantity_restored']} {removed['part_name']} ({removed['part_sku']}) from repair {repair_number}; stock was returned.",
+        target_type="part",
+        target_id=removed["part_id"],
+        details={
+            **removed,
+            "repair_request_id": repair_request_id,
+            "repair_number": repair_number,
+        },
+    )
 
     return {"ok": True}
 

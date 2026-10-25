@@ -108,11 +108,24 @@ def add_part_to_repair(
         }, None
 
 
-def remove_part_from_repair(repair_part_id: int) -> bool:
+def remove_part_from_repair(repair_part_id: int) -> dict | None:
     with Session(engine) as s:
         row = s.get(Repair_Parts, repair_part_id)
         if row is None:
-            return False
+            return None
+
+        part = s.get(Parts, row.part_id)
+        if part is None:
+            return None
+
+        removed = {
+            "part_id": row.part_id,
+            "part_name": part.name,
+            "part_sku": part.sku,
+            "quantity_restored": row.quantity_used,
+            "repair_id": row.repair_id,
+            "unit_price": float(row.unit_price),
+        }
 
         s.execute(
             text("UPDATE parts SET quantity = quantity + :qty WHERE id = :pid"),
@@ -131,4 +144,4 @@ def remove_part_from_repair(repair_part_id: int) -> bool:
 
         s.delete(row)
         s.commit()
-        return True
+        return removed

@@ -18,15 +18,16 @@ def list_parts(
     search: str = "",
     category: str | None = None,
     low_stock_only: bool = False,
+    include_inactive: bool = False,
 ) -> list[dict]:
     sql = """
         SELECT id, name, sku, category, quantity,
             reorder_threshold, unit_price, supplier, is_active,
             created_at, updated_at
         FROM parts
-        WHERE is_active = true
+        WHERE (:include_inactive OR is_active = true)
     """
-    params: dict = {}
+    params: dict = {"include_inactive": include_inactive}
 
     term = search.strip()
     if term:
@@ -138,13 +139,15 @@ def create_part(data: CreatePartRequest) -> Parts | None:
 def update_part(part_id: int, data: UpdatePartRequest) -> bool:
     with Session(engine) as s:
         part = s.get(Parts, part_id)
-        if part is None or not part.is_active:
+        if part is None:
             return False
 
         if data.name is not None:
             part.name = data.name
         if data.category is not None:
             part.category = data.category
+        if data.quantity is not None:
+            part.quantity = data.quantity
         if data.reorder_threshold is not None:
             part.reorder_threshold = data.reorder_threshold
         if data.unit_price is not None:
@@ -178,6 +181,19 @@ def deactivate_part(part_id: int) -> bool:
             return False
 
         part.is_active = False
+        part.updated_at = _now()
+        s.commit()
+        return True
+
+
+def restore_part(part_id: int) -> bool:
+    """Restore a deactivated catalog item without changing its stock history."""
+    with Session(engine) as s:
+        part = s.get(Parts, part_id)
+        if part is None or part.is_active:
+            return False
+
+        part.is_active = True
         part.updated_at = _now()
         s.commit()
         return True

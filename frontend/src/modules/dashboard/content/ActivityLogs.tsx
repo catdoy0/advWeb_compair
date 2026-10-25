@@ -149,7 +149,7 @@ export default function ActivityLogs() {
       <PageHeader
         eyebrow="System / Audit trail"
         title="Activity logs"
-        description="Review account, repair, checkout, and workspace changes across the system."
+        description="Review account, repair, checkout, inventory, and workspace changes across the system."
         action={
           <CommonButton
             variant="outline"
@@ -176,7 +176,7 @@ export default function ActivityLogs() {
                 setSearch(event.target.value);
                 setPage(1);
               }}
-              placeholder="Search users, repairs, actions..."
+              placeholder="Search users, repairs, inventory, actions..."
               aria-label="Search activity logs"
               className="h-9 w-full rounded-md border border-[#d8e0eb] bg-white pl-9 pr-3 text-[11px] text-[#102c50] outline-none focus:border-[#2870e8] dark:border-slate-700 dark:bg-[#182536] dark:text-white"
             />

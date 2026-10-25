@@ -1,3 +1,4 @@
+from src.models.activity_logs import ActivityLogs
 from src.models.appointments import Appointments
 from src.models.conversation_reads import Conversation_Reads
 from src.models.conversations import Conversations
@@ -24,6 +25,7 @@ from src.models.repairs import Repairs
 from src.models.users import Users
 
 __all__ = [
+    "ActivityLogs",
     "AppointmentStatus",
     "Appointments",
     "ComputerType",

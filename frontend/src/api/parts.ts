@@ -13,11 +13,13 @@ export async function listParts(
   category: string = "",
   lowStockOnly: boolean = false,
   throwOnError = false,
+  includeInactive = false,
 ): Promise<Part[]> {
   const params = new URLSearchParams();
   if (search.trim()) params.set("search", search.trim());
   if (category) params.set("category", category);
   if (lowStockOnly) params.set("low_stock_only", "true");
+  if (includeInactive) params.set("include_inactive", "true");
 
   const query = params.toString();
   const res = await apiFetch(`${PATH}${query ? `?${query}` : ""}`, {
@@ -98,11 +100,12 @@ export async function updatePart(
 export async function restockPart(
   partId: number,
   amount: number,
+  reference?: string,
 ): Promise<{ ok: boolean; message: string }> {
   const res = await apiFetch(`${PATH}/${partId}/restock`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount }),
+    body: JSON.stringify({ amount, reference: reference?.trim() || null }),
   });
 
   if (!res.ok) {
@@ -125,8 +128,20 @@ export async function deactivatePart(
   const res = await apiFetch(`${PATH}/${partId}`, { method: "DELETE" });
 
   if (!res.ok) {
-    return { ok: false, message: "Failed to remove part." };
+    return { ok: false, message: "Failed to mark part unavailable." };
   }
 
-  return { ok: true, message: "Part removed." };
+  return { ok: true, message: "Part marked unavailable." };
+}
+
+export async function restorePart(
+  partId: number,
+): Promise<{ ok: boolean; message: string }> {
+  const res = await apiFetch(`${PATH}/${partId}/restore`, { method: "POST" });
+
+  if (!res.ok) {
+    return { ok: false, message: "Failed to restore part availability." };
+  }
+
+  return { ok: true, message: "Part is available again." };
 }

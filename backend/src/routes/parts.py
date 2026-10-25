@@ -6,6 +6,7 @@ from src.schemas.part import (
     RestockPartRequest,
     UpdatePartRequest,
 )
+from src.services.activity_log import record_activity
 from src.services.auth import require_active_user as _require_user
 from src.sql import part as part_sql
 
@@ -32,6 +33,7 @@ def list_parts(
     search: str = Query(""),
     category: str | None = Query(None),
     low_stock_only: bool = Query(False),
+    include_inactive: bool = Query(False),
 ):
     user = _require_user(request)
     _require_team(user)
@@ -40,6 +42,7 @@ def list_parts(
         search=search,
         category=category,
         low_stock_only=low_stock_only,
+        include_inactive=include_inactive,
     )
 
 
@@ -87,6 +90,20 @@ def create_part(
             detail="A part with that SKU already exists",
         )
 
+    record_activity(
+        user.id,
+        "PART_CREATED",
+        f"Added inventory part {part.name} ({part.sku}) with {part.quantity} units.",
+        target_type="part",
+        target_id=part.id,
+        details={
+            "sku": part.sku,
+            "name": part.name,
+            "quantity": part.quantity,
+            "unit_price": part.unit_price,
+        },
+    )
+
     return {"id": part.id, "sku": part.sku}
 
 
@@ -99,9 +116,41 @@ def update_part(
     user = _require_user(request)
     _require_admin(user)
 
+    previous = part_sql.get_part(part_id)
+    if previous is None:
+        raise HTTPException(status_code=404, detail="Part not found")
+
     ok = part_sql.update_part(part_id, body)
     if not ok:
         raise HTTPException(status_code=404, detail="Part not found")
+
+    changes = body.model_dump(exclude_unset=True, exclude_none=True)
+    changes.pop("quantity", None)
+    quantity_after = body.quantity if body.quantity is not None else previous["quantity"]
+    updated_name = body.name or previous["name"]
+    updated_sku = previous["sku"]
+    description = f"Updated inventory part {updated_name} ({updated_sku})."
+    if body.quantity is not None and body.quantity != previous["quantity"]:
+        description = (
+            f"Updated stock for {updated_name} ({updated_sku}) from "
+            f"{previous['quantity']} to {body.quantity} units."
+        )
+
+    quantity_changed = body.quantity is not None and body.quantity != previous["quantity"]
+    record_activity(
+        user.id,
+        "PART_STOCK_ADJUSTED" if quantity_changed else "PART_UPDATED",
+        description,
+        target_type="part",
+        target_id=part_id,
+        details={
+            "sku": updated_sku,
+            "changes": changes,
+            "quantity_before": previous["quantity"],
+            "quantity_after": quantity_after,
+            "quantity_change": quantity_after - previous["quantity"],
+        },
+    )
 
     return {"ok": True}
 
@@ -115,9 +164,29 @@ def restock_part(
     user = _require_user(request)
     _require_admin(user)
 
+    part = part_sql.get_part(part_id)
+    if part is None:
+        raise HTTPException(status_code=404, detail="Part not found")
+
     ok = part_sql.restock_part(part_id, body.amount)
     if not ok:
         raise HTTPException(status_code=404, detail="Part not found")
+
+    record_activity(
+        user.id,
+        "PART_STOCK_RECEIVED",
+        f"Received {body.amount} units of {part['name']} ({part['sku']}); stock is now {part['quantity'] + body.amount}."
+        + (f" Reference: {body.reference.strip()}." if body.reference and body.reference.strip() else ""),
+        target_type="part",
+        target_id=part_id,
+        details={
+            "sku": part["sku"],
+            "quantity_received": body.amount,
+            "quantity_before": part["quantity"],
+            "quantity_after": part["quantity"] + body.amount,
+            "reference": body.reference.strip() if body.reference else None,
+        },
+    )
 
     return {"ok": True}
 
@@ -127,8 +196,46 @@ def deactivate_part(part_id: int, request: Request):
     user = _require_user(request)
     _require_admin(user)
 
+    part = part_sql.get_part(part_id)
+    if part is None:
+        raise HTTPException(status_code=404, detail="Part not found")
+
     ok = part_sql.deactivate_part(part_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Part not found")
+
+    record_activity(
+        user.id,
+        "PART_MARKED_UNAVAILABLE",
+        f"Marked inventory part {part['name']} ({part['sku']}) unavailable.",
+        target_type="part",
+        target_id=part_id,
+        details={"sku": part["sku"], "quantity_on_hand": part["quantity"]},
+    )
+
+    return {"ok": True}
+
+
+@router.post("/{part_id}/restore")
+def restore_part(part_id: int, request: Request):
+    user = _require_user(request)
+    _require_admin(user)
+
+    part = part_sql.get_part(part_id)
+    if part is None or part["is_active"]:
+        raise HTTPException(status_code=404, detail="Inactive part not found")
+
+    ok = part_sql.restore_part(part_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Inactive part not found")
+
+    record_activity(
+        user.id,
+        "PART_RESTORED",
+        f"Restored inventory part {part['name']} ({part['sku']}) to available stock.",
+        target_type="part",
+        target_id=part_id,
+        details={"sku": part["sku"], "quantity_on_hand": part["quantity"]},
+    )
 
     return {"ok": True}

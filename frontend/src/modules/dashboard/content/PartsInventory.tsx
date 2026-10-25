@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Package, Pencil, Plus, Search } from "lucide-react";
+import { Ban, Package, Pencil, Plus, RotateCcw, Search } from "lucide-react";
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
+import AreYouSureModal from "../../../components/common/modals/AreYouSureModal";
+import MessageModal from "../../../components/common/modals/MessageModal";
 import DataTable, {
   type DataTableColumn,
 } from "../../../components/common/widgets/DataTable";
@@ -15,9 +17,12 @@ import {
   listCategories,
   listParts,
   getInventorySummary,
+  deactivatePart,
+  restorePart,
 } from "../../../api/parts";
 import type { InventorySummary, Part } from "../../../types/parts";
 import { setIfChanged } from "../../../utils/setIfChanged";
+import { useAuth } from "../../../context/AuthContext";
 
 // ---------- helpers ----------
 
@@ -32,6 +37,8 @@ function formatMoney(value: number): string {
 // ---------- page ----------
 
 export default function PartsInventory() {
+  const { session } = useAuth();
+  const canManageParts = session?.user.role !== "TECHNICIAN";
   const [parts, setParts] = useState<Part[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [summary, setSummary] = useState<InventorySummary>({
@@ -51,6 +58,9 @@ export default function PartsInventory() {
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [editingPart, setEditingPart] = useState<Part | null>(null);
+  const [availabilityTarget, setAvailabilityTarget] = useState<Part | null>(null);
+  const [availabilityError, setAvailabilityError] = useState("");
+  const [availabilityErrorOpen, setAvailabilityErrorOpen] = useState(false);
 
   // fetch parts + summary; refreshTick forces a re-run
   useEffect(() => {
@@ -58,7 +68,7 @@ export default function PartsInventory() {
     const timer = setTimeout(async () => {
       setLoading(true);
       const [partsRes, summaryRes] = await Promise.all([
-        listParts(search, category),
+        listParts(search, category, false, false, true),
         getInventorySummary(),
       ]);
       if (cancelled) return;
@@ -100,6 +110,22 @@ export default function PartsInventory() {
     setFormModalOpen(true);
   };
 
+  const confirmAvailabilityChange = async () => {
+    if (!availabilityTarget) return;
+
+    const result = availabilityTarget.is_active
+      ? await deactivatePart(availabilityTarget.id)
+      : await restorePart(availabilityTarget.id);
+
+    if (!result.ok) {
+      setAvailabilityError(result.message);
+      setAvailabilityErrorOpen(true);
+      return;
+    }
+
+    refresh();
+  };
+
   const columns: DataTableColumn<Part>[] = [
     {
       key: "name",
@@ -135,7 +161,9 @@ export default function PartsInventory() {
       render: (p) => (
         <span
           className={`text-[12px] font-bold ${
-            p.is_low_stock
+            !p.is_active
+              ? "text-slate-400"
+              : p.is_low_stock
               ? "text-[#b45309] dark:text-[#fbbf24]"
               : "text-[#15946a] dark:text-[#00d68f]"
           }`}
@@ -168,39 +196,73 @@ export default function PartsInventory() {
       key: "status",
       label: "Status",
       className: "w-[11%]",
-      sortValue: (part) => part.is_low_stock ? "Low stock" : "In stock",
+      sortValue: (part) => !part.is_active ? "Unavailable" : part.is_low_stock ? "Low stock" : "In stock",
       render: (p) => (
         <span
           className={`inline-flex rounded px-2 py-1 text-[9px] font-bold ${
-            p.is_low_stock
+            !p.is_active
+              ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+              : p.is_low_stock
               ? "bg-[#fef3c7] text-[#b45309] dark:bg-[#3a2a0f] dark:text-[#fbbf24]"
               : "bg-[#e6f5ef] text-[#15946a] dark:bg-[#1d4775] dark:text-[#00d68f]"
           }`}
         >
-          {p.is_low_stock ? "Low stock" : "In stock"}
+          {!p.is_active ? "Unavailable" : p.is_low_stock ? "Low stock" : "In stock"}
         </span>
       ),
     },
-    {
+    ...(canManageParts ? [{
       key: "actions",
       label: "",
-      className: "w-[6%]",
-      render: (p) => (
-        <button
-          type="button"
-          onClick={() => openEdit(p)}
-          aria-label={`Edit ${p.name}`}
-          className="flex items-center gap-1 text-[10px] font-semibold text-[#2870e8] hover:underline"
-        >
-          <Pencil size={12} />
-          Edit
-        </button>
+      className: "w-[16%]",
+      render: (p: Part) => (
+        <div className="flex items-center gap-3 whitespace-nowrap">
+          <button
+            type="button"
+            onClick={() => openEdit(p)}
+            aria-label={`Edit ${p.name}`}
+            className="flex items-center gap-1 text-[10px] font-semibold text-[#2870e8] hover:underline"
+          >
+            <Pencil size={12} />
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => setAvailabilityTarget(p)}
+            aria-label={p.is_active ? `Make ${p.name} unavailable` : `Restore ${p.name}`}
+            className={`flex items-center gap-1 text-[10px] font-semibold hover:underline ${
+              p.is_active ? "text-slate-500" : "text-[#15946a]"
+            }`}
+          >
+            {p.is_active ? <Ban size={12} /> : <RotateCcw size={12} />}
+            {p.is_active ? "Unavailable" : "Restore"}
+          </button>
+        </div>
       ),
-    },
+    }] : []),
   ];
 
   return (
     <DashboardPage>
+      <AreYouSureModal
+        open={availabilityTarget !== null}
+        onClose={() => setAvailabilityTarget(null)}
+        onConfirm={confirmAvailabilityChange}
+        header={availabilityTarget?.is_active ? "Make part unavailable" : "Restore part availability"}
+        title={availabilityTarget?.is_active ? "Remove from available stock?" : "Make this part available again?"}
+        description={availabilityTarget?.is_active
+          ? `${availabilityTarget.name} will remain in the inventory table with its stock quantity preserved, but it won't be available to add to repairs or receive new stock.`
+          : `${availabilityTarget?.name ?? "This part"} will be available to add to repairs and receive new stock again. Its recorded quantity will be preserved.`}
+        confirmLabel={availabilityTarget?.is_active ? "Make unavailable" : "Restore part"}
+        variant={availabilityTarget?.is_active ? "danger" : "default"}
+      />
+
+      <MessageModal
+        open={availabilityErrorOpen}
+        onClose={() => setAvailabilityErrorOpen(false)}
+        title={availabilityError || "Unable to update part availability"}
+      />
+
       <ReceiveStockModal
         open={receiveModalOpen}
         onClose={() => setReceiveModalOpen(false)}
@@ -235,13 +297,15 @@ export default function PartsInventory() {
               Receive stock
             </CommonButton>
 
-            <CommonButton
-              onClick={openCreate}
-              className="flex items-center gap-2 px-4 py-2"
-            >
-              <Plus size={14} />
-              New part
-            </CommonButton>
+            {canManageParts && (
+              <CommonButton
+                onClick={openCreate}
+                className="flex items-center gap-2 px-4 py-2"
+              >
+                <Plus size={14} />
+                New part
+              </CommonButton>
+            )}
           </div>
         }
       />
@@ -311,14 +375,10 @@ export default function PartsInventory() {
               {parts.length} part{parts.length === 1 ? "" : "s"} in view
             </h2>
             <p className="mt-0.5 text-[11px] text-slate-400">
-              Search by exact part or SKU, then filter the catalog by category.
+              Unavailable parts stay listed here but cannot be added to repairs or restocked.
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Stock updated just now
-          </div>
         </div>
 
         {loading ? (
@@ -334,15 +394,19 @@ export default function PartsInventory() {
               No parts in inventory
             </p>
             <p className="mt-1 text-[10px] text-slate-400">
-              Add the first part to start tracking stock.
+              {canManageParts
+                ? "Add the first part to start tracking stock."
+                : "There are no parts to receive stock for yet."}
             </p>
-            <CommonButton
-              onClick={openCreate}
-              className="mt-4 flex items-center gap-2 px-4 py-2"
-            >
-              <Plus size={14} />
-              New part
-            </CommonButton>
+            {canManageParts && (
+              <CommonButton
+                onClick={openCreate}
+                className="mt-4 flex items-center gap-2 px-4 py-2"
+              >
+                <Plus size={14} />
+                New part
+              </CommonButton>
+            )}
           </div>
         ) : (
           <DataTable
@@ -351,7 +415,7 @@ export default function PartsInventory() {
             onRefresh={refresh}
             onPoll={async () => {
               const [nextParts, nextSummary, nextCategories] = await Promise.all([
-                listParts(search, category, false, true),
+                listParts(search, category, false, true, true),
                 getInventorySummary(true),
                 listCategories(true),
               ]);
