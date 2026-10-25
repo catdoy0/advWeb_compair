@@ -117,8 +117,8 @@ export default function SignInFormSection() {
       }
 
       navigate(ROUTES.DASHBOARD.ROOT);
-    } catch {
-      setError("Unable to create account. Please try again.");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to create account. Please try again.");
     } finally {
       setSubmitting(false);
     }

@@ -4,10 +4,12 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 from starlette.responses import JSONResponse
 
-from src.config import validate_config
+from src.config import limiter, validate_config
 from src.database import (
     assert_database_ready,
     ensure_activity_log_table,
@@ -62,6 +64,9 @@ app.add_middleware(
     RequestBodyLimitMiddleware,
     max_body_size=10 * 1024 * 1024 # 10mb
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler) # type: ignore
 
 
 app.include_router(authRouter, prefix="/auth")

@@ -35,8 +35,8 @@ export default function SignInFormSection() {
       }
 
       navigate(ROUTES.DASHBOARD.ROOT);
-    } catch {
-      setError("Unable to sign in. Please try again.");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to sign in. Please try again.");
     } finally {
       setSubmitting(false);
     }

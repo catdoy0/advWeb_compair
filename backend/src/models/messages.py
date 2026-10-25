@@ -10,5 +10,6 @@ class Messages(SQLModel, table=True):
     sender_id: int = Field( foreign_key="users.id", index=True,)
 
     content: str
+    is_deleted: bool = Field(default=False, nullable=False)
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)

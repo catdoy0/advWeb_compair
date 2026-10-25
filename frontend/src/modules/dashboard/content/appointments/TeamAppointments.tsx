@@ -17,6 +17,7 @@ import {
   getNextAppointment,
 } from "../../../../api/repair_requests";
 import type { Appointment as ApiAppointment } from "../../../../types/repair_requests";
+import { setIfChanged } from "../../../../utils/setIfChanged";
 
 // ---------- slot capacity config ----------
 
@@ -264,6 +265,14 @@ export default function TeamAppointments() {
               columns={columns}
               data={appointments}
               onRefresh={() => setRefreshTick((tick) => tick + 1)}
+              onPoll={async () => {
+                const [nextAppointments, nextCounts] = await Promise.all([
+                  listAppointments(selectedDate.format("YYYY-MM-DD"), true),
+                  getAppointmentWeekCounts(weekStart, weekEnd, true),
+                ]);
+                setIfChanged(setAppointments, nextAppointments);
+                setIfChanged(setCountsByDay, nextCounts);
+              }}
               refreshing={loading}
               emptyMessage="No appointments scheduled for this day."
             />

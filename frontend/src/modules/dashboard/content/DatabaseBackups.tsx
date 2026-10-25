@@ -14,6 +14,7 @@ import {
   restoreDatabaseSnapshot,
   type DatabaseSnapshot,
 } from "../../../api/administration";
+import { setIfChanged } from "../../../utils/setIfChanged";
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -57,6 +58,16 @@ export default function DatabaseBackups({ onSnapshotCountChange }: { onSnapshotC
     onSnapshotCountChange?.(items.filter((snapshot) => !snapshot.archived_at).length);
     setError(result.error);
     setLoading(false);
+  }, [onSnapshotCountChange]);
+
+  const pollSnapshots = useCallback(async () => {
+    const result = await getDatabaseSnapshots();
+    const items = result.items;
+    if (items !== null) {
+      setIfChanged(setSnapshots, items);
+      onSnapshotCountChange?.(items.filter((snapshot) => !snapshot.archived_at).length);
+    }
+    setIfChanged(setError, result.error);
   }, [onSnapshotCountChange]);
 
   useEffect(() => {
@@ -272,6 +283,7 @@ export default function DatabaseBackups({ onSnapshotCountChange }: { onSnapshotC
             columns={columns}
             data={visibleSnapshots}
             onRefresh={() => setReload((value) => value + 1)}
+            onPoll={pollSnapshots}
             refreshing={loading}
             emptyMessage={showArchived ? "No archived snapshots." : "No active snapshots yet. Create one before making major changes."}
           />

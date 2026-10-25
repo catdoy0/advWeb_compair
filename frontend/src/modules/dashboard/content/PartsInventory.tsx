@@ -17,6 +17,7 @@ import {
   getInventorySummary,
 } from "../../../api/parts";
 import type { InventorySummary, Part } from "../../../types/parts";
+import { setIfChanged } from "../../../utils/setIfChanged";
 
 // ---------- helpers ----------
 
@@ -348,6 +349,16 @@ export default function PartsInventory() {
             columns={columns}
             data={parts}
             onRefresh={refresh}
+            onPoll={async () => {
+              const [nextParts, nextSummary, nextCategories] = await Promise.all([
+                listParts(search, category, false, true),
+                getInventorySummary(true),
+                listCategories(true),
+              ]);
+              setIfChanged(setParts, nextParts);
+              setIfChanged(setSummary, nextSummary);
+              setIfChanged(setCategories, nextCategories);
+            }}
             refreshing={loading}
             emptyMessage="No parts match this filter."
           />

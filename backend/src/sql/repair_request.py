@@ -927,7 +927,7 @@ def get_customer_overview(customer_id: int) -> dict:
         # last message in the customer's general conversation
         last_message = s.execute(text("""
             SELECT
-                m.content,
+                CASE WHEN m.is_deleted THEN 'Deleted Message' ELSE m.content END AS content,
                 m.created_at,
                 u.first_name,
                 u.last_name,

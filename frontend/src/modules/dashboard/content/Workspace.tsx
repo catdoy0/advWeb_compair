@@ -26,6 +26,7 @@ import type {
   AssignedRepair,
   WorkspaceResponse,
 } from "../../../types/repair_requests";
+import { setIfChanged } from "../../../utils/setIfChanged";
 
 dayjs.extend(relativeTime);
 
@@ -279,6 +280,10 @@ export default function Workspace() {
             columns={columns}
             data={items}
             onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            onPoll={async () => {
+              const next = await getWorkspace();
+              if (next) setIfChanged(setData, next);
+            }}
             refreshing={loading}
             emptyMessage="No devices assigned to you."
           />

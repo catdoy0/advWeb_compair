@@ -1,4 +1,5 @@
 import { API_URL } from "./config";
+import { responseErrorMessage } from "./httpErrors";
 import type { StoreSettings, UserSession, SignUpPayload } from "../types/auth";
 
 function normalizeUserSession(data: UserSession): UserSession {
@@ -8,12 +9,7 @@ function normalizeUserSession(data: UserSession): UserSession {
 }
 
 async function readError(res: Response, fallback: string): Promise<string> {
-  try {
-    const data = await res.json();
-    return data.detail ?? fallback;
-  } catch {
-    return fallback;
-  }
+  return responseErrorMessage(res, fallback);
 }
 
 export async function requestPasswordReset(email: string): Promise<{ ok: boolean; message: string }> {
@@ -130,6 +126,7 @@ export async function login(email: string, password: string): Promise<UserSessio
     credentials: "include",
     body: JSON.stringify({email, password}),
   });
+  if (res.status === 429) throw new Error(await responseErrorMessage(res, "Unable to sign in."));
   if (!res.ok) return null;
   return normalizeUserSession(await res.json());
 }
@@ -143,6 +140,7 @@ export async function signUp(payload: SignUpPayload): Promise<UserSession | null
     credentials: "include",
     body: JSON.stringify(payload),
   });
+  if (res.status === 429) throw new Error(await responseErrorMessage(res, "Unable to create account."));
   if (!res.ok) return null;
   return normalizeUserSession(await res.json());
 }

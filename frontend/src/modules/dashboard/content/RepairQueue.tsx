@@ -14,6 +14,7 @@ import UserAvatar from "../../../components/common/widgets/UserAvatar";
 import { listRepairQueue } from "../../../api/repair_requests";
 import type { RepairQueueItem } from "../../../types/repair_requests";
 import RepairDetailModal from "./repair-queue/RepairDetailModal";
+import { setIfChanged } from "../../../utils/setIfChanged";
 
 dayjs.extend(relativeTime);
 
@@ -305,6 +306,12 @@ export default function RepairQueue() {
             columns={columns}
             data={items}
             onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            onPoll={async () => {
+              const data = await listRepairQueue(activeStatus || undefined, search);
+              if (data.error) return;
+              setIfChanged(setItems, data.items);
+              setIfChanged(setCounts, data.counts);
+            }}
             refreshing={loading}
             emptyMessage="No requests match this filter."
           />

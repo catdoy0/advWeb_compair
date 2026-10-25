@@ -2,10 +2,12 @@ import logging
 from calendar import day_name
 from datetime import date, datetime
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
+from src.config import limiter
 from src.models.enums import UserRole
 from src.schemas.repair_note import CreateNoteRequest
 from src.schemas.repair_part import AddPartRequest
@@ -32,6 +34,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 DAY_CAPACITY = 6
+BUSINESS_TIMEZONE = ZoneInfo("Asia/Manila")
 
 
 def _validate_preferred_datetime(
@@ -39,13 +42,17 @@ def _validate_preferred_datetime(
     available_times: list[str],
     available_days: list[int],
 ):
-    now = datetime.now()
-    preferred_dt = datetime.combine(body.preferred_date, body.preferred_time)
+    now = datetime.now(BUSINESS_TIMEZONE)
+    preferred_dt = datetime.combine(
+        body.preferred_date,
+        body.preferred_time,
+        tzinfo=BUSINESS_TIMEZONE,
+    )
 
     if preferred_dt < now:
         raise HTTPException(status_code=400, detail="Preferred date and time must be in the future")
 
-    if (body.preferred_date - date.today()).days > 31:
+    if (body.preferred_date - now.date()).days > 31:
         raise HTTPException(status_code=400, detail="Preferred date must be within 14 days")
 
     if body.preferred_date.isoweekday() not in available_days:
@@ -65,6 +72,7 @@ def _validate_preferred_datetime(
 
 
 @router.post("", response_model=RepairRequestCreated)
+@limiter.limit("3/minutes")
 async def create_repair_request(
     body: CreateRepairRequestRequest,
     request: Request,
@@ -100,10 +108,10 @@ async def create_repair_request(
         )
 
     # find-or-create the device for this customer
-    device = rr_sql.find_device(customer_id, body.computer_name)
+    device = rr_sql.find_device(customer_id, body.computer_name) # type: ignore
     if device is None:
         device = rr_sql.create_device(
-            customer_id=customer_id,
+            customer_id=customer_id, # type: ignore
             computer_name=body.computer_name,
             computer_type=body.computer_type,
             serial_number=body.serial_number,
@@ -113,7 +121,7 @@ async def create_repair_request(
         raise HTTPException(status_code=500, detail="Failed to create device")
 
     req = rr_sql.create_repair_request(
-        customer_id=customer_id,
+        customer_id=customer_id, # type: ignore
         device_id=device.id,
         contact_detail=body.contact_detail,
         requested_service=body.requested_service,
@@ -132,11 +140,11 @@ async def create_repair_request(
     )
 
     conv = rr_sql.create_conversation_for_repair(
-        customer_id=customer_id,
+        customer_id=customer_id, # type: ignore
         repair_request_id=req.id,
     )
 
-    customer = get_user_by_id(customer_id)
+    customer = get_user_by_id(customer_id) # type: ignore
     customer_name = " ".join(
         p for p in [customer.first_name or "", customer.last_name or ""] if p # type: ignore
     ).strip() or customer.email # type: ignore

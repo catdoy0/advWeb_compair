@@ -94,7 +94,7 @@ def get_admin_overview(on_date: date, user_id: int) -> dict:
             JOIN users u ON u.id = c.customer_id
             LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
             JOIN LATERAL (
-                SELECT content
+                SELECT CASE WHEN is_deleted THEN 'Deleted Message' ELSE content END AS content
                 FROM messages
                 WHERE conversation_id = c.id
                 ORDER BY created_at DESC, id DESC
@@ -106,6 +106,7 @@ def get_admin_overview(on_date: date, user_id: int) -> dict:
                 LEFT JOIN conversation_reads cr
                   ON cr.conversation_id = c.id AND cr.user_id = :user_id
                 WHERE m.conversation_id = c.id
+                  AND m.is_deleted = FALSE
                   AND m.sender_id != :user_id
                   AND (cr.last_read_message_id IS NULL
                        OR m.id > cr.last_read_message_id)
@@ -123,6 +124,7 @@ def get_admin_overview(on_date: date, user_id: int) -> dict:
             LEFT JOIN conversation_reads cr
               ON cr.conversation_id = c.id AND cr.user_id = :user_id
             WHERE c.archived_at IS NULL AND u.archived_at IS NULL
+              AND m.is_deleted = FALSE
               AND m.sender_id != :user_id
               AND (cr.last_read_message_id IS NULL
                    OR m.id > cr.last_read_message_id)

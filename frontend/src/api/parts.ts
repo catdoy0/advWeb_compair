@@ -12,6 +12,7 @@ export async function listParts(
   search: string = "",
   category: string = "",
   lowStockOnly: boolean = false,
+  throwOnError = false,
 ): Promise<Part[]> {
   const params = new URLSearchParams();
   if (search.trim()) params.set("search", search.trim());
@@ -22,19 +23,26 @@ export async function listParts(
   const res = await apiFetch(`${PATH}${query ? `?${query}` : ""}`, {
     method: "GET",
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    if (throwOnError) throw new Error("Unable to load parts.");
+    return [];
+  }
   return await res.json();
 }
 
-export async function listCategories(): Promise<string[]> {
+export async function listCategories(throwOnError = false): Promise<string[]> {
   const res = await apiFetch(`${PATH}/categories`, { method: "GET" });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    if (throwOnError) throw new Error("Unable to load part categories.");
+    return [];
+  }
   return await res.json();
 }
 
-export async function getInventorySummary(): Promise<InventorySummary> {
+export async function getInventorySummary(throwOnError = false): Promise<InventorySummary> {
   const res = await apiFetch(`${PATH}/summary`, { method: "GET" });
   if (!res.ok) {
+    if (throwOnError) throw new Error("Unable to load inventory summary.");
     return { total_skus: 0, needs_reorder: 0, units_on_hand: 0, stock_value: 0 };
   }
   return await res.json();

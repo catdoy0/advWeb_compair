@@ -1,6 +1,8 @@
 import os
 
 from dotenv import load_dotenv
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 load_dotenv()
 
@@ -49,3 +51,7 @@ def validate_config():
             "Missing required environment variables: "
             + ", ".join(missing)
         )
+
+
+
+limiter = Limiter(key_func=get_remote_address)

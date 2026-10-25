@@ -37,7 +37,13 @@ export default function AccountActions({
       <button
         type="button"
         onClick={() => onArchive(account)}
-        className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 hover:text-amber-600 hover:underline cursor-pointer dark:text-slate-400"
+        disabled={!suspended}
+        title={suspended ? "Archive account" : "Suspend this account before archiving"}
+        className={`flex items-center gap-1.5 text-[10px] font-semibold dark:text-slate-400 ${
+          suspended
+            ? "text-slate-500 hover:text-amber-600 hover:underline cursor-pointer"
+            : "text-slate-300 cursor-not-allowed dark:text-slate-600"
+        }`}
       >
         <Archive size={12} />
         Archive

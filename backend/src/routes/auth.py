@@ -13,6 +13,7 @@ from src.config import (
     FORGET_PASS_EMAIL_APP_PASS,
     GOOGLE_CLIENT_ID,
     REFRESH_TOKEN_EXPIRE_DAYS,
+    limiter,
 )
 from src.models.users import UserRole
 from src.schemas.auth import (
@@ -31,6 +32,7 @@ from src.security.tokens import (
     decode_access_token,
     decode_password_reset_token,
 )
+from src.services.activity_log import record_activity
 from src.services.auth import (
     get_current_user_id,
     refresh_session,
@@ -40,7 +42,6 @@ from src.services.auth import (
     signin_user,
     signup_user,
 )
-from src.services.activity_log import record_activity
 from src.services.store_settings import (
     read_settings,
     serialize_store_settings,
@@ -196,7 +197,8 @@ def verify_reset_code(data: PasswordResetCodeRequest, request: Request, response
 
 
 @router.post("/signup")
-def signup(data: SignUpRequest, response: Response):
+@limiter.limit("5/minutes")
+def signup(data: SignUpRequest, request: Request, response: Response):
     user, access_token, refresh_token = signup_user(data)
     record_activity(
         user.id, "ACCOUNT_CREATED", "Created an account.",
@@ -211,7 +213,8 @@ def signup(data: SignUpRequest, response: Response):
 
 
 @router.post("/signin")
-def signin(data: LoginRequest, response: Response):
+@limiter.limit("5/minutes")
+def signin(data: LoginRequest, request: Request, response: Response):
     user, access_token, refresh_token = signin_user(data)
     _set_auth_cookies(response, access_token, refresh_token)
     store_settings = read_settings()
@@ -222,7 +225,8 @@ def signin(data: LoginRequest, response: Response):
 
 
 @router.post("/google")
-def google_signin(data: GoogleSignInRequest, response: Response):
+@limiter.limit("5/minutes")
+def google_signin(data: GoogleSignInRequest, request: Request, response: Response):
     if not GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=503, detail="Google sign-in is not configured")
 

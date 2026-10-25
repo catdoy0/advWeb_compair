@@ -221,6 +221,7 @@ export default function Adminstration() {
             columns={columns}
             data={admin.accounts}
             onRefresh={admin.reload}
+            onPoll={admin.poll}
             refreshing={admin.loading}
             emptyMessage="No accounts found for this role."
           />

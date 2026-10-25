@@ -43,8 +43,9 @@ export async function listConversations(
 export async function listMessages(
   conversationId: number,
   beforeId?: number,
+  limit = 15,
 ): Promise<Message[]> {
-  const params = new URLSearchParams({ limit: "50" });
+  const params = new URLSearchParams({ limit: String(limit) });
   if (beforeId !== undefined) params.set("before_id", String(beforeId));
 
   const res = await apiFetch(`${CHAT}/${conversationId}/messages?${params}`, {
@@ -80,6 +81,16 @@ export async function sendMessage(
   return await res.json();
 }
 
+export async function deleteMessage(
+  conversationId: number,
+  messageId: number,
+): Promise<boolean> {
+  const res = await apiFetch(`${CHAT}/${conversationId}/messages/${messageId}`, {
+    method: "DELETE",
+  });
+  return res.ok;
+}
+
 
 export async function markConversationRead(
   conversationId: number,
@@ -88,4 +99,13 @@ export async function markConversationRead(
     method: "POST",
   });
   return res.ok;
+}
+
+export async function markAllConversationsRead(): Promise<boolean> {
+  try {
+    const res = await apiFetch(`${CHAT}/read-all`, { method: "POST" });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

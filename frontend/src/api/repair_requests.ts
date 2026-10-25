@@ -1,4 +1,5 @@
 import { apiFetch } from "./auth";
+import { responseErrorMessage } from "./httpErrors";
 import type {
   Appointment,
   AppointmentCountsByDay,
@@ -23,6 +24,7 @@ export async function createRepairRequest(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (res.status === 429) throw new Error(await responseErrorMessage(res, "Unable to create repair request."));
   if (!res.ok) return null;
   return await res.json();
 }
@@ -30,11 +32,15 @@ export async function createRepairRequest(
 
 export async function listAppointments(
   onDate: string,
+  throwOnError = false,
 ): Promise<Appointment[]> {
   const res = await apiFetch(`appointments?on_date=${onDate}`, {
     method: "GET",
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    if (throwOnError) throw new Error("Unable to load appointments.");
+    return [];
+  }
   return await res.json();
 }
 
@@ -42,11 +48,15 @@ export async function listAppointments(
 export async function getAppointmentWeekCounts(
   start: string,
   end: string,
+  throwOnError = false,
 ): Promise<AppointmentCountsByDay> {
   const res = await apiFetch( `appointments/week?start=${start}&end=${end}`,
     { method: "GET" },
   );
-  if (!res.ok) return {};
+  if (!res.ok) {
+    if (throwOnError) throw new Error("Unable to load appointment counts.");
+    return {};
+  }
   return await res.json();
 }
 
@@ -267,16 +277,22 @@ export async function updateEstimate(
 }
 
 
-export async function listMyDevices(): Promise<CustomerDevice[]> {
+export async function listMyDevices(throwOnError = false): Promise<CustomerDevice[]> {
   const res = await apiFetch("repair-requests/my-devices", { method: "GET" });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    if (throwOnError) throw new Error("Unable to load devices.");
+    return [];
+  }
   return await res.json();
 }
 
 
-export async function listTeamDevices(): Promise<TeamDevice[]> {
+export async function listTeamDevices(throwOnError = false): Promise<TeamDevice[]> {
   const res = await apiFetch("repair-requests/devices", { method: "GET" });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    if (throwOnError) throw new Error("Unable to load devices.");
+    return [];
+  }
   return await res.json();
 }
 

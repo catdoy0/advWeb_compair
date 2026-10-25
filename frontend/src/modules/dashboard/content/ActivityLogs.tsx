@@ -7,6 +7,7 @@ import DashboardPage from "../components/DashboardPage";
 import DashboardPanel from "../components/DashboardPanel";
 import PageHeader from "../components/PageHeader";
 import { getActivityLogs, type ActivityLogEntry } from "../../../api/administration";
+import { setIfChanged } from "../../../utils/setIfChanged";
 
 const PAGE_SIZE = 20;
 
@@ -191,6 +192,12 @@ export default function ActivityLogs() {
             columns={columns}
             data={rows}
             onRefresh={() => setRefreshTick((value) => value + 1)}
+            onPoll={async () => {
+              const result = await getActivityLogs(search.trim(), page, PAGE_SIZE);
+              if (!result) return;
+              setIfChanged(setRows, result.items);
+              setIfChanged(setTotal, result.total);
+            }}
             refreshing={loading}
             emptyMessage="No matching activity found."
           />

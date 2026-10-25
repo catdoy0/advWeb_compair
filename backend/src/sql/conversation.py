@@ -101,7 +101,7 @@ def list_conversations_for_team(user_id: int) -> list[dict]:
             LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
             LEFT JOIN devices d ON d.id = rr.device_id
             LEFT JOIN LATERAL (
-                SELECT content
+                SELECT CASE WHEN is_deleted THEN 'Deleted Message' ELSE content END AS content
                 FROM messages
                 WHERE conversation_id = c.id
                 ORDER BY last_message_at DESC, id DESC
@@ -113,6 +113,7 @@ def list_conversations_for_team(user_id: int) -> list[dict]:
                 LEFT JOIN conversation_reads cr
                     ON cr.conversation_id = c.id AND cr.user_id = :uid
                 WHERE unread_message.conversation_id = c.id
+                  AND unread_message.is_deleted = FALSE
                   AND unread_message.sender_id != :uid
                   AND (cr.last_read_message_id IS NULL
                        OR unread_message.id > cr.last_read_message_id)
@@ -165,7 +166,7 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
             LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
             LEFT JOIN devices d          ON d.id = rr.device_id
             LEFT JOIN LATERAL (
-                SELECT content
+                SELECT CASE WHEN is_deleted THEN 'Deleted Message' ELSE content END AS content
                 FROM messages
                 WHERE conversation_id = c.id
                 ORDER BY created_at DESC
@@ -177,6 +178,7 @@ def list_conversations_for_customer(customer_id: int) -> list[dict]:
                 LEFT JOIN conversation_reads cr
                     ON cr.conversation_id = c.id AND cr.user_id = :cid
                 WHERE unread_message.conversation_id = c.id
+                  AND unread_message.is_deleted = FALSE
                   AND unread_message.sender_id != :cid
                   AND (cr.last_read_message_id IS NULL
                        OR unread_message.id > cr.last_read_message_id)
@@ -242,7 +244,7 @@ def search_conversations_for_team(
             LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
             LEFT JOIN devices d ON d.id = rr.device_id
             LEFT JOIN LATERAL (
-                SELECT content
+                SELECT CASE WHEN is_deleted THEN 'Deleted Message' ELSE content END AS content
                 FROM messages
                 WHERE conversation_id = c.id
                 ORDER BY created_at DESC, id DESC
@@ -254,6 +256,7 @@ def search_conversations_for_team(
                 LEFT JOIN conversation_reads cr
                     ON cr.conversation_id = c.id AND cr.user_id = :uid
                 WHERE unread_message.conversation_id = c.id
+                  AND unread_message.is_deleted = FALSE
                   AND unread_message.sender_id != :uid
                   AND (cr.last_read_message_id IS NULL
                        OR unread_message.id > cr.last_read_message_id)
@@ -306,7 +309,7 @@ def search_conversations_for_customer(
             LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
             LEFT JOIN devices d ON d.id = rr.device_id
             LEFT JOIN LATERAL (
-                SELECT content
+                SELECT CASE WHEN is_deleted THEN 'Deleted Message' ELSE content END AS content
                 FROM messages
                 WHERE conversation_id = c.id
                 ORDER BY last_message_at DESC, id DESC
@@ -318,6 +321,7 @@ def search_conversations_for_customer(
                 LEFT JOIN conversation_reads cr
                     ON cr.conversation_id = c.id AND cr.user_id = :cid
                 WHERE unread_message.conversation_id = c.id
+                  AND unread_message.is_deleted = FALSE
                   AND unread_message.sender_id != :cid
                   AND (cr.last_read_message_id IS NULL
                        OR unread_message.id > cr.last_read_message_id)
@@ -370,7 +374,7 @@ def list_messages(
     with Session(engine) as s:
         if before_id is not None:
             sql = text("""
-                SELECT m.id, m.conversation_id, m.sender_id, m.content, m.created_at,
+                SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_deleted, m.created_at,
                        u.first_name, u.last_name, u.role
                 FROM messages m
                 JOIN users u ON u.id = m.sender_id
@@ -381,7 +385,7 @@ def list_messages(
             params = {"cid": conversation_id, "before": before_id, "limit": limit}
         else:
             sql = text("""
-                SELECT m.id, m.conversation_id, m.sender_id, m.content, m.created_at,
+                SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_deleted, m.created_at,
                        u.first_name, u.last_name, u.role
                 FROM messages m
                 JOIN users u ON u.id = m.sender_id
@@ -400,6 +404,7 @@ def list_messages(
             "conversation_id": row["conversation_id"],
             "sender_id": row["sender_id"],
             "content": row["content"],
+            "is_deleted": row["is_deleted"],
             "created_at": row["created_at"],
             "first_name": row["first_name"],
             "last_name": row["last_name"],
@@ -426,6 +431,26 @@ def insert_message(
         return msg
 
 
+def get_message(conversation_id: int, message_id: int) -> Messages | None:
+    with Session(engine) as s:
+        return s.exec(
+            select(Messages)
+            .where(Messages.id == message_id)
+            .where(Messages.conversation_id == conversation_id)
+        ).first()
+
+
+def mark_message_deleted(message_id: int) -> bool:
+    with Session(engine) as s:
+        message = s.get(Messages, message_id)
+        if message is None or message.is_deleted:
+            return False
+        message.is_deleted = True
+        s.add(message)
+        s.commit()
+        return True
+
+
 def get_unread_count_for_customer(customer_id: int) -> int:
     with Session(engine) as s:
         return s.execute(text("""
@@ -436,6 +461,7 @@ def get_unread_count_for_customer(customer_id: int) -> int:
                 ON cr.conversation_id = c.id
                AND cr.user_id = :cid
             WHERE c.customer_id = :cid AND c.archived_at IS NULL
+              AND m.is_deleted = FALSE
               AND m.sender_id != :cid
               AND (cr.last_read_message_id IS NULL OR m.id > cr.last_read_message_id)
         """), {"cid": customer_id}).scalar_one()
@@ -465,6 +491,33 @@ def mark_conversation_read(conversation_id: int, user_id: int) -> None:
             "now": _now(),
         })
         s.commit()
+
+
+def mark_all_conversations_read(user_id: int, *, customer_only: bool) -> int:
+    """Advance this user's read marker to the latest message in every visible thread."""
+    with Session(engine) as s:
+        result = s.execute(text("""
+            INSERT INTO conversation_reads
+                (conversation_id, user_id, last_read_message_id, updated_at)
+            SELECT c.id, :uid, latest.message_id, :now
+            FROM conversations c
+            JOIN LATERAL (
+                SELECT MAX(m.id) AS message_id
+                FROM messages m
+                WHERE m.conversation_id = c.id
+            ) latest ON latest.message_id IS NOT NULL
+            WHERE c.archived_at IS NULL
+              AND (:customer_only = FALSE OR c.customer_id = :uid)
+            ON CONFLICT (conversation_id, user_id)
+            DO UPDATE SET
+                last_read_message_id = GREATEST(
+                    conversation_reads.last_read_message_id,
+                    EXCLUDED.last_read_message_id
+                ),
+                updated_at = EXCLUDED.updated_at
+        """), {"uid": user_id, "now": _now(), "customer_only": customer_only})
+        s.commit()
+        return result.rowcount or 0
 
 
 def archive_conversation(conversation_id: int) -> bool:
@@ -540,7 +593,8 @@ def list_archived_conversations(search: str, limit: int, offset: int) -> dict:
             LEFT JOIN repair_requests rr ON rr.id = c.repair_request_id
             LEFT JOIN devices d ON d.id = rr.device_id
             LEFT JOIN LATERAL (
-                SELECT content FROM messages
+                SELECT CASE WHEN is_deleted THEN 'Deleted Message' ELSE content END AS content
+                FROM messages
                 WHERE conversation_id = c.id
                 ORDER BY created_at DESC, id DESC LIMIT 1
             ) latest ON TRUE

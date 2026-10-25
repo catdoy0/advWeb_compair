@@ -27,6 +27,7 @@ import {
 import type { Appointment as ApiAppointment } from "../../../../types/repair_requests";
 
 import { useEvents } from "../../../../context/EventContext";
+import { setIfChanged } from "../../../../utils/setIfChanged";
 
 // ---------- helpers ----------
 
@@ -316,6 +317,15 @@ export default function CustomerAppointments() {
               columns={columns}
               data={appointments}
               onRefresh={() => setRefreshTick((tick) => tick + 1)}
+              autoRefresh={false}
+              onPoll={async () => {
+                const [nextAppointments, nextCounts] = await Promise.all([
+                  listAppointments(selectedDate.format("YYYY-MM-DD"), true),
+                  getAppointmentWeekCounts(weekStart, weekEnd, true),
+                ]);
+                setIfChanged(setAppointments, nextAppointments);
+                setIfChanged(setCountsByDay, nextCounts);
+              }}
               refreshing={loading}
               emptyMessage="No appointments scheduled for this day."
             />

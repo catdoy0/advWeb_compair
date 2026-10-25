@@ -40,11 +40,13 @@ async def publish_message(
     conversation_id: int,
     message_id: int,
     sender_id: int,
+    deleted: bool = False,
 ) -> None:
     payload = {
         "conversation_id": conversation_id,
         "message_id": message_id,
         "sender_id": sender_id,
+        "deleted": deleted,
     }
 
     for sub in list(_subscribers):

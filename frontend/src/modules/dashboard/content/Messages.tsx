@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Archive, ChevronRight, MessageCircle, Search } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Archive, CheckCheck, ChevronRight, MessageCircle, Search, Trash2 } from "lucide-react";
 
 import CommonButton from "../../../components/common/widgets/CommonButton";
 import AreYouSureModal from "../../../components/common/modals/AreYouSureModal";
@@ -13,6 +13,8 @@ import { dummySession } from "../../../dummyData";
 import {
   listConversations,
   listMessages,
+  deleteMessage,
+  markAllConversationsRead,
   markConversationRead,
   sendMessage,
 } from "../../../api/conversations";
@@ -22,6 +24,8 @@ import { archiveConversation } from "../../../api/administration";
 import dayjs from "dayjs";
 import calendar from "dayjs/plugin/calendar";
 dayjs.extend(calendar);
+
+const MESSAGE_PAGE_SIZE = 15;
 
 // ---------- display helpers ----------
 
@@ -99,8 +103,13 @@ export default function Messages() {
   const [conversationRefreshTick, setConversationRefreshTick] = useState(0);
   const [sending, setSending] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [archiveError, setArchiveError] = useState("");
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
+  const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
+  const [messageActionError, setMessageActionError] = useState("");
 
   const conversationListRef = useRef<HTMLDivElement | null>(null);
   const conversationOffsetRef = useRef(0);
@@ -108,6 +117,10 @@ export default function Messages() {
   const conversationLoadingRef = useRef(false);
   const conversationGenerationRef = useRef(0);
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const loadingOlderMessagesRef = useRef(false);
+  const hasOlderMessagesRef = useRef(false);
+  const messageGenerationRef = useRef(0);
+  const prependScrollPositionRef = useRef<{ height: number; top: number } | null>(null);
   const [atBottom, setAtBottom] = useState(true);
 
   const loadConversations = useCallback(async (
@@ -174,15 +187,33 @@ export default function Messages() {
     el.scrollTop = el.scrollHeight;
   }, [messages, atBottom]);
 
+  useLayoutEffect(() => {
+    const pendingScrollPosition = prependScrollPositionRef.current;
+    const el = messagesRef.current;
+    if (!pendingScrollPosition || !el) return;
+
+    el.scrollTop = pendingScrollPosition.top + el.scrollHeight - pendingScrollPosition.height;
+    prependScrollPositionRef.current = null;
+  }, [messages]);
+
   // load message
   useEffect(() => {
     if (selectedId === null) return;
 
+    const generation = ++messageGenerationRef.current;
     let cancelled = false;
+    setAtBottom(true);
+    setMessages([]);
+    loadingOlderMessagesRef.current = false;
+    setLoadingOlderMessages(false);
+    hasOlderMessagesRef.current = false;
+    prependScrollPositionRef.current = null;
     (async () => {
-      const data = await listMessages(selectedId);
-      if (cancelled) return;
+      const data = await listMessages(selectedId, undefined, MESSAGE_PAGE_SIZE);
+      if (cancelled || generation !== messageGenerationRef.current) return;
       setMessages([...data].reverse());
+      const hasOlder = data.length === MESSAGE_PAGE_SIZE;
+      hasOlderMessagesRef.current = hasOlder;
       setConversations((current) => current.map((conversation) =>
         conversation.id === selectedId
           ? { ...conversation, unread_count: 0 }
@@ -197,17 +228,85 @@ export default function Messages() {
     };
   }, [selectedId]);
 
+  const loadOlderMessages = useCallback(async () => {
+    if (
+      selectedId === null ||
+      !hasOlderMessagesRef.current ||
+      loadingOlderMessagesRef.current ||
+      messages.length === 0
+    ) return;
+
+    const firstMessageId = messages[0].id;
+    const generation = messageGenerationRef.current;
+    const el = messagesRef.current;
+    if (!el) return;
+
+    loadingOlderMessagesRef.current = true;
+    setLoadingOlderMessages(true);
+    try {
+      const data = await listMessages(selectedId, firstMessageId, MESSAGE_PAGE_SIZE);
+      if (generation !== messageGenerationRef.current) return;
+      const olderMessages = [...data].reverse();
+      if (olderMessages.length === 0) {
+        hasOlderMessagesRef.current = false;
+        return;
+      }
+
+      prependScrollPositionRef.current = {
+        height: el.scrollHeight,
+        top: el.scrollTop,
+      };
+      setMessages((current) => {
+        const currentIds = new Set(current.map((message) => message.id));
+        return [
+          ...olderMessages.filter((message) => !currentIds.has(message.id)),
+          ...current,
+        ];
+      });
+
+      if (data.length < MESSAGE_PAGE_SIZE) {
+        hasOlderMessagesRef.current = false;
+      }
+    } catch (error) {
+      console.error("Failed to load older messages", error);
+    } finally {
+      if (generation === messageGenerationRef.current) {
+        loadingOlderMessagesRef.current = false;
+        setLoadingOlderMessages(false);
+      }
+    }
+  }, [messages, selectedId]);
+
   const handlePoke = useCallback(
-    async (conversationId: number, senderId: number) => {
+    async (conversationId: number, senderId: number, messageId: number, deleted: boolean) => {
+      setConversationRefreshTick((tick) => tick + 1);
+
+      if (deleted) {
+        if (conversationId === selectedId) {
+          setMessages((current) => current.map((message) =>
+            message.id === messageId
+              ? { ...message, content: "Deleted Message", is_deleted: true }
+              : message,
+          ));
+        }
+        return;
+      }
+
       // The sending client already appends its message and updates the preview locally.
       if (senderId === viewerId) return;
 
-      setConversationRefreshTick((tick) => tick + 1);
-
       if (conversationId !== selectedId) return;
 
-      const data = await listMessages(conversationId);
-      setMessages([...data].reverse());
+      const generation = messageGenerationRef.current;
+      const data = await listMessages(conversationId, undefined, MESSAGE_PAGE_SIZE);
+      if (generation !== messageGenerationRef.current) return;
+      setMessages((current) => {
+        const messageById = new Map(current.map((message) => [message.id, message]));
+        for (const message of data) messageById.set(message.id, message);
+        return [...messageById.values()].sort((a, b) => a.id - b.id);
+      });
+      const hasOlder = data.length === MESSAGE_PAGE_SIZE || hasOlderMessagesRef.current;
+      hasOlderMessagesRef.current = hasOlder;
       await markConversationRead(conversationId);
       window.dispatchEvent(new Event("conversations-read"));
     },
@@ -215,6 +314,30 @@ export default function Messages() {
   );
 
   useMessageEvents(handlePoke);
+
+  async function handleDeleteMessage() {
+    const message = messageToDelete;
+    if (selectedId === null || !message || deletingMessageId !== null) return;
+    setDeletingMessageId(message.id);
+    setMessageActionError("");
+    try {
+      const ok = await deleteMessage(selectedId, message.id);
+      if (!ok) {
+        setMessageActionError("Unable to delete this message. Please try again.");
+        return;
+      }
+      setMessages((current) => current.map((item) =>
+        item.id === message.id
+          ? { ...item, content: "Deleted Message", is_deleted: true }
+          : item,
+      ));
+      setMessageToDelete(null);
+    } catch {
+      setMessageActionError("Unable to delete this message. Please try again.");
+    } finally {
+      setDeletingMessageId(null);
+    }
+  }
 
   async function handleSend() {
     if (selectedId === null) return;
@@ -253,6 +376,21 @@ export default function Messages() {
     setArchiving(false);
   }
 
+  async function handleMarkAllRead() {
+    if (markingAllRead || unreadTotal === 0) return;
+    setMarkingAllRead(true);
+    try {
+      const success = await markAllConversationsRead();
+      if (!success) return;
+      setUnreadTotal(0);
+      setConversations((current) => current.map((conversation) => ({ ...conversation, unread_count: 0 })));
+      setConversationRefreshTick((tick) => tick + 1);
+      window.dispatchEvent(new Event("conversations-read"));
+    } finally {
+      setMarkingAllRead(false);
+    }
+  }
+
   const selectedConversation =
     conversations.find((c) => c.id === selectedId) ?? null;
   const canArchiveSelected = Boolean(
@@ -271,6 +409,16 @@ export default function Messages() {
         description="This repair conversation will be removed from the inbox. Its messages will be kept and can be restored from Archive."
         confirmLabel="Archive conversation"
       />
+      <AreYouSureModal
+        open={messageToDelete !== null}
+        onClose={() => setMessageToDelete(null)}
+        onConfirm={handleDeleteMessage}
+        header="Delete message"
+        title="Delete this message?"
+        description="The message will remain in the conversation as “Deleted Message”. This action cannot be undone."
+        confirmLabel={deletingMessageId === messageToDelete?.id ? "Deleting..." : "Delete message"}
+        variant="danger"
+      />
       <PageHeader
         eyebrow="Customer care / inbox"
         title="Service messages"
@@ -286,7 +434,7 @@ export default function Messages() {
         {/* Inbox */}
         <DashboardPanel className="flex h-full min-h-[500px] flex-col" contentClassName="flex min-h-0 flex-1 flex-col">
           <div className="border-b border-[#d8e0eb] px-4 py-3 dark:border-slate-700">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-md font-bold text-[#102c50] dark:text-white">
                   Inbox
@@ -297,9 +445,18 @@ export default function Messages() {
                     : `${conversationCount} conversation${conversationCount === 1 ? "" : "s"}`}
                 </p>
               </div>
-              {/* <span className="rounded bg-[#eef4ff] dark:bg-[#0b213d] px-2 py-0.5 text-xs font-semibold text-[#2870e8] dark:text-[#8ec5ff]"> */}
-              {/*   {conversations.length} */}
-              {/* </span> */}
+              {unreadTotal > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void handleMarkAllRead()}
+                  disabled={markingAllRead}
+                  aria-label="Mark all inbox messages as read"
+                  title="Mark all as read"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-[#eef4ff] hover:text-[#2870e8] disabled:cursor-wait disabled:opacity-50 dark:hover:bg-[#172a42] dark:hover:text-[#8ec5ff]"
+                >
+                  <CheckCheck size={15} className={markingAllRead ? "animate-pulse" : ""} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -442,11 +599,24 @@ export default function Messages() {
                 )}
               </div>
 
+              {messageActionError && (
+                <p role="alert" className="px-5 pt-2 text-[10px] text-red-600 dark:text-red-400">
+                  {messageActionError}
+                </p>
+              )}
+
               <div
                 ref={messagesRef}
-                onScroll={(e) => setAtBottom(isNearBottom(e.currentTarget))}
-                className="min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-5"
+                onScroll={(e) => {
+                  const element = e.currentTarget;
+                  setAtBottom(isNearBottom(element));
+                  if (element.scrollTop <= 50) void loadOlderMessages();
+                }}
+                className="min-h-0 flex-1 flex flex-col gap-3 overflow-y-auto p-5"
               >
+                {loadingOlderMessages && (
+                  <p className="text-center text-[10px] text-slate-400">Loading older messages...</p>
+                )}
                 {messages.length === 0 ? (
                   <p className="m-auto text-[11px] text-slate-400">
                     No messages yet. Say hello.
@@ -454,24 +624,44 @@ export default function Messages() {
                 ) : (
                   messages.map((msg) => {
                     const isMine = msg.sender_id === viewerId;
+                    const isDeleted = msg.is_deleted;
+                    const canDelete = !isDeleted && (
+                      isMine || currentUser.role === "ADMIN" || currentUser.role === "SUPER_ADMIN"
+                    );
                     return (
                       <div
                         key={msg.id}
-                        className={`flex max-w-full flex-col ${
+                        className={`group flex max-w-full flex-col ${
                           isMine ? "self-end items-end" : "self-start items-start"
                         }`}
                       >
                         <p className="mb-1 text-[10px] text-slate-400">
                           {messageSenderLabel(msg, currentUser.role, viewerId)}
                         </p>
-                        <div
-                          className={`rounded-lg px-4 py-2.5 text-xs leading-5 ${
-                            isMine
-                              ? "bg-[#2870e8] text-white"
-                              : "bg-[#f1f5f9] text-slate-700 dark:bg-[#182536] dark:text-slate-300"
-                          }`}
-                        >
-                          {msg.content}
+                        <div className={`flex items-center gap-2 ${isMine ? "flex-row-reverse" : ""}`}>
+                          <div
+                            className={`rounded-lg px-4 py-2.5 text-xs leading-5 ${
+                              isDeleted
+                                ? "border border-dashed border-slate-300 bg-transparent text-slate-400 opacity-70 dark:border-slate-600 dark:text-slate-500"
+                                : isMine
+                                  ? "bg-[#2870e8] text-white"
+                                  : "bg-[#f1f5f9] text-slate-700 dark:bg-[#182536] dark:text-slate-300"
+                            }`}
+                          >
+                            {msg.content}
+                          </div>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => setMessageToDelete(msg)}
+                              disabled={deletingMessageId !== null}
+                              aria-label="Delete message"
+                              title="Delete message"
+                              className="rounded p-1 text-slate-400 opacity-0 transition hover:bg-slate-100 hover:text-red-500 focus:opacity-100 group-hover:opacity-100 disabled:cursor-wait disabled:opacity-40 dark:hover:bg-slate-700"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
                         </div>
                           <span className={`mt-1 text-[9px] text-slate-400 dark:text-slate-500`}>
                             {/* {new Date(msg.created_at).toLocaleTimeString([], { hour: '', minute: '2-digit' })} */}

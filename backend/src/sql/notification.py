@@ -3,7 +3,9 @@ from operator import or_
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from sqlmodel import Session, col, select
+
+# such a shitty orm
+from sqlmodel import Session, col, not_, select
 
 from src.database import engine
 from src.models.enums import NotificationType, UserRole
@@ -16,12 +18,12 @@ def _now() -> datetime:
 
 
 def get_team_user_ids() -> list[int]:
-    """Everyone who is not a customer — the recipients of a new-request notification."""
+    """Everyone who is not a customer, the recipients of a new-request notification."""
     with Session(engine) as s:
         rows = s.exec(
             select(Users.id)
-            .where(Users.role != UserRole.CUSTOMER)
-            .where(Users.is_active == True)  # noqa: E712
+            .where(Users.role.not_in([UserRole.CUSTOMER, UserRole.SUPER_ADMIN])) # type: ignore
+            .where(Users.is_active == True)
         ).all()
 
     return [row for row in rows if row is not None]
