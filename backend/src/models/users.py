@@ -12,7 +12,7 @@ class Users(SQLModel, table=True):
     last_name: str | None = Field(default=None, max_length=72)
 
     email: str = Field(max_length=255, unique=True, index=True)
-    password_hash: str = Field(max_length=255)
+    password_hash: str | None = Field(max_length=255)
 
     oauth_provider: str | None = Field(default=None, max_length=50)
     oauth_id: str | None = Field(default=None, max_length=500)

@@ -16,6 +16,7 @@ import {
   type ArchivedAccount,
   type ArchivedConversation,
 } from "../../../api/administration";
+import { setIfChanged } from "../../../utils/setIfChanged";
 
 const PAGE_SIZE = 10;
 type ArchiveTab = "messages" | "accounts";
@@ -286,6 +287,12 @@ export default function ArchivePage() {
             columns={messageColumns}
             data={messages}
             onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            onPoll={async () => {
+              const result = await getArchivedMessages(search.trim(), page);
+              if (!result) return;
+              setIfChanged(setMessages, result.items);
+              setIfChanged(setTotal, result.total);
+            }}
             refreshing={loading}
             emptyMessage="No archived conversations found."
           />
@@ -294,6 +301,12 @@ export default function ArchivePage() {
             columns={accountColumns}
             data={accounts}
             onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            onPoll={async () => {
+              const result = await getArchivedAccounts(search.trim(), page);
+              if (!result) return;
+              setIfChanged(setAccounts, result.items);
+              setIfChanged(setTotal, result.total);
+            }}
             refreshing={loading}
             emptyMessage="No archived accounts found."
           />

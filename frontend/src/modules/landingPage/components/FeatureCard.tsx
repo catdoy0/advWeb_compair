@@ -3,18 +3,20 @@ import type { LucideIcon } from "lucide-react"
 import CommonCard from "../../../components/common/CommonCard"
 
 interface FeatureCardProps {
+  id?: string
   icon: LucideIcon
   title: string
   description: string
 }
 
 export default function FeatureCard({
+  id,
   icon: Icon,
   title,
   description,
 }: FeatureCardProps) {
   return (
-    <CommonCard className="p-6">
+    <CommonCard id={id} className="scroll-mt-24 p-6">
       <Icon
         size={15}
         className="text-[#285ab0] dark:text-blue-400"

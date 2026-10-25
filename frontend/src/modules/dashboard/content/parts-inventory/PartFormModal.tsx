@@ -101,8 +101,8 @@ function PartFormContent({
       showMessage("Reorder threshold cannot be negative.", false);
       return;
     }
-    if (isCreate && quantity < 0) {
-      showMessage("Initial quantity cannot be negative.", false);
+    if (quantity < 0) {
+      showMessage("Quantity cannot be negative.", false);
       return;
     }
 
@@ -125,6 +125,7 @@ function PartFormContent({
         const result = await updatePart(part.id, {
           name: name.trim(),
           category: category.trim(),
+          quantity,
           reorder_threshold: reorderThreshold,
           unit_price: unitPrice,
           supplier: supplier.trim() || null,
@@ -173,24 +174,13 @@ function PartFormContent({
         </p>
       </div>
 
-      {/* Edit: read-only summary */}
+      {/* Edit: immutable SKU; stock count is editable below. */}
       {!isCreate && part && (
-        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#e6ebf2] pt-4 dark:border-slate-700">
-          <div>
+        <div className="mt-4 border-t border-[#e6ebf2] pt-4 dark:border-slate-700">
             <p className={labelClass}>SKU</p>
             <p className="mt-1.5 font-mono text-[12px] font-semibold text-[#102c50] dark:text-white">
               {part.sku}
             </p>
-          </div>
-          <div>
-            <p className={labelClass}>On hand</p>
-            <p className="mt-1.5 text-[12px] font-semibold text-[#102c50] dark:text-white">
-              {part.quantity}
-              <span className="ml-2 text-[10px] font-normal text-slate-400">
-                (adjust via Receive stock)
-              </span>
-            </p>
-          </div>
         </div>
       )}
 
@@ -246,18 +236,23 @@ function PartFormContent({
           </datalist>
         </div>
 
-        {isCreate && (
-          <div>
-            <label className={labelClass}>Initial quantity</label>
-            <input
-              type="number"
-              min={0}
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value) || 0)}
-              className={`${inputClass} mt-1.5`}
-            />
-          </div>
-        )}
+        <div>
+          <label className={labelClass}>
+            {isCreate ? "Initial quantity" : "Quantity on hand"}
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value) || 0)}
+            className={`${inputClass} mt-1.5`}
+          />
+          <p className="mt-1.5 text-[10px] text-slate-400">
+            {isCreate
+              ? "Starting stock count."
+              : "Set the exact count; quantity changes are recorded in activity logs."}
+          </p>
+        </div>
 
         <div className={isCreate ? "" : "col-span-2"}>
           <label className={labelClass}>Reorder threshold</label>

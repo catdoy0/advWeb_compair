@@ -216,6 +216,10 @@ export default function CreateRepairRequestModal({
       setMessageModalMessage(`Repair ${result.repair_number} submitted. Check your messages for updates.`);
       setMessageModalOpen(true);
       onUpdated(preferredDate);
+    } catch (error) {
+      setMessageWasSuccess(false);
+      setMessageModalMessage(error instanceof Error ? error.message : "Failed to create repair request.");
+      setMessageModalOpen(true);
     } finally {
       setSubmitting(false);
     }

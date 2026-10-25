@@ -34,6 +34,7 @@ export interface CreatePartPayload {
 export interface UpdatePartPayload {
   name?: string;
   category?: string;
+  quantity?: number;
   reorder_threshold?: number;
   unit_price?: number;
   supplier?: string | null;

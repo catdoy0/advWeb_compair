@@ -5,8 +5,8 @@ from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from src.schemas.profile import ChangeEmail, ChangeName, ChangePassword
-from src.services.auth import get_current_user_id
 from src.services.activity_log import record_activity
+from src.services.auth import get_current_user_id
 from src.sql import profile as profile_sql
 from src.sql.auth import email_exists, get_user_by_id
 

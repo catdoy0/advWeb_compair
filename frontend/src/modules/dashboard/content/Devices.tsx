@@ -17,6 +17,7 @@ import CustomerRepairDetailModal from "./repair-queue/CustomerRepairDetailModal"
 
 import { listTeamDevices } from "../../../api/repair_requests";
 import type { TeamDevice } from "../../../types/repair_requests";
+import { setIfChanged } from "../../../utils/setIfChanged";
 
 const PAGE_SIZE = 10;
 
@@ -287,6 +288,7 @@ export default function Devices() {
             columns={columns}
             data={pageItems}
             onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            onPoll={async () => setIfChanged(setDevices, await listTeamDevices(true))}
             refreshing={loading}
             emptyMessage="No computers match your filters."
           />

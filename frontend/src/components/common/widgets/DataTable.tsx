@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, RefreshCw } from "lucide-react";
 
 type SortValue = string | number | Date | null | undefined;
@@ -16,8 +16,10 @@ interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
   data: T[];
   emptyMessage?: string;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
+  onPoll?: () => void | Promise<void>;
   refreshing?: boolean;
+  autoRefresh?: boolean;
 }
 
 export default function DataTable<T>({
@@ -25,9 +27,49 @@ export default function DataTable<T>({
   data,
   emptyMessage = "No records found.",
   onRefresh,
+  onPoll,
   refreshing = false,
+  autoRefresh = true,
 }: DataTableProps<T>) {
   const [sort, setSort] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
+  const pollHandlerRef = useRef(onPoll);
+  const refreshingRef = useRef(refreshing);
+  const pollInFlightRef = useRef(false);
+
+  useEffect(() => {
+    pollHandlerRef.current = onPoll;
+  }, [onPoll]);
+
+  useEffect(() => {
+    refreshingRef.current = refreshing;
+  }, [refreshing]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const poll = () => {
+      if (document.visibilityState !== "visible") return;
+      const handler = pollHandlerRef.current;
+      if (!handler || refreshingRef.current || pollInFlightRef.current) return;
+
+      try {
+        const result = handler();
+        if (result && typeof (result as Promise<void>).then === "function") {
+          pollInFlightRef.current = true;
+          void Promise.resolve(result)
+            .catch((error) => console.error("Data table background refresh failed", error))
+            .finally(() => { pollInFlightRef.current = false; });
+        }
+      } catch (error) {
+        console.error("Data table background refresh failed", error);
+      }
+    };
+
+    const intervalId = window.setInterval(poll, 10000);
+
+    return () => window.clearInterval(intervalId);
+  }, [autoRefresh]);
+
   const sortedData = useMemo(() => {
     if (!sort) return data;
     const column = columns.find((item) => item.key === sort.key);

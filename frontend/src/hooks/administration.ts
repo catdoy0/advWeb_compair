@@ -8,6 +8,7 @@ import type {
   AccountFilter,
 } from "../modules/dashboard/content/administration/types";
 import { useLoading } from "../context/LoadingContext";
+import { setIfChanged } from "../utils/setIfChanged";
 
 const PAGE_SIZE = 10;
 
@@ -75,6 +76,16 @@ export function useAccountsAdmin() {
 
     setAccounts((usersRes ?? []).map(toAccount));
     setTotals(totalsRes);
+  };
+
+  const poll = async () => {
+    const role = FILTER_TO_ROLE[activeFilter];
+    const [usersRes, totalsRes] = await Promise.all([
+      getUsers(PAGE_SIZE, page, search, role),
+      getTotalUsers(),
+    ]);
+    if (usersRes) setIfChanged(setAccounts, usersRes.map(toAccount));
+    if (totalsRes) setIfChanged(setTotals, totalsRes);
   };
 
   const handleSearchChange = (value: string) => {
@@ -201,6 +212,7 @@ export function useAccountsAdmin() {
     handleEditClick,
     handleEditClose,
     reload,
+    poll,
 
     // message modal
     messageModalOpen,

@@ -38,12 +38,14 @@ export default function AreYouSureModal({
 
       <div className="flex flex-col justify-between items-start border-b-2 border-black/10 mb-5">
         <div className="flex flex-col mb-5">
-          {variant === "danger" && (
-            <TriangleAlert size={16} className="text-slate-400" />
-          )}
-          <p className="text-xs font-bold tracking-widest text-slate-400">
-            {variant === "danger" ? "WARNING —" : "PLEASE CONFIRM —"}
-          </p>
+          <div className="flex gap-2 items-center">
+            {variant === "danger" && (
+              <TriangleAlert size={16} className="text-slate-400" />
+            )}
+            <p className="text-xs font-bold tracking-widest text-slate-400">
+              {variant === "danger" ? "WARNING —" : "PLEASE CONFIRM —"}
+            </p>
+          </div>
           <h1 className="text-md font-extrabold">
             {header}
           </h1>

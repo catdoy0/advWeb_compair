@@ -11,6 +11,6 @@ class ChangeEmail(BaseModel):
     currentPassword: str
 
 class ChangePassword(BaseModel):
-    currentPassword: str
+    currentPassword: str | None = None
     newPassword: str
     confirmPassword: str

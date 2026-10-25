@@ -12,36 +12,42 @@ import FeatureCard from "./components/FeatureCard"
 
 const features = [
   {
+    id: "service-repair-requests",
     icon: FileText,
     title: "Repair requests & diagnosis",
     description:
       "Get the problem information you need to submit a request, a technician confirms the diagnosis and notes are always visible.",
   },
   {
+    id: "service-device-registration",
     icon: Laptop,
     title: "Device registration",
     description:
       "Keep every laptop, desktop, or peripheral on file — type, brand, serial, and the repair history tied to it.",
   },
   {
+    id: "service-appointments",
     icon: CalendarDays,
     title: "Appointment booking",
     description:
       "Pick an open date and time slot for drop-off, and edit or cancel it yourself if your plans change.",
   },
   {
+    id: "service-status-tracking",
     icon: CircleCheck,
     title: "Live status tracking",
     description:
       "Follow the repair through diagnostics, engineering, parts, completed, and released — updated as it moves.",
   },
   {
+    id: "service-cost-estimates",
     icon: Flag,
     title: "Transparent cost estimates",
     description:
       "Estimated and final repair costs are recorded on the request, so there are no surprises at pickup.",
   },
   {
+    id: "service-history",
     icon: ClipboardCheck,
     title: "Service history",
     description:
@@ -68,6 +74,7 @@ export default function FeaturesSection() {
           {features.map((feature) => (
             <FeatureCard
               key={feature.title}
+              id={feature.id}
               {...feature}
             />
           ))}

@@ -26,5 +26,6 @@ export interface Message {
   sender_name: string | null;
   sender_role: string;
   content: string;
+  is_deleted: boolean;
   created_at: string;
 }

@@ -206,6 +206,7 @@ export default function TestComponent() {
                 ]
               }
               onRefresh={() => window.location.reload()}
+              autoRefresh={false}
             />
           </ShowcaseSection>
 

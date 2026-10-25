@@ -2,10 +2,12 @@ import logging
 from calendar import day_name
 from datetime import date, datetime
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
+from src.config import limiter
 from src.models.enums import UserRole
 from src.schemas.repair_note import CreateNoteRequest
 from src.schemas.repair_part import AddPartRequest
@@ -32,6 +34,24 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 DAY_CAPACITY = 6
+BUSINESS_TIMEZONE = ZoneInfo("Asia/Manila")
+
+
+@router.get("/reports")
+def get_service_report(request: Request, month: str | None = Query(default=None)):
+    user = _require_user(request)
+    if user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Only administrators can view service reports")
+    report_month = None
+    if month:
+        try:
+            parsed_month = datetime.strptime(month, "%Y-%m")
+            if parsed_month.strftime("%Y-%m") != month:
+                raise ValueError
+            report_month = parsed_month.date()
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Month must use YYYY-MM format") from exc
+    return rr_sql.get_service_report(month_count=8, report_month=report_month)
 
 
 def _validate_preferred_datetime(
@@ -39,13 +59,17 @@ def _validate_preferred_datetime(
     available_times: list[str],
     available_days: list[int],
 ):
-    now = datetime.now()
-    preferred_dt = datetime.combine(body.preferred_date, body.preferred_time)
+    now = datetime.now(BUSINESS_TIMEZONE)
+    preferred_dt = datetime.combine(
+        body.preferred_date,
+        body.preferred_time,
+        tzinfo=BUSINESS_TIMEZONE,
+    )
 
     if preferred_dt < now:
         raise HTTPException(status_code=400, detail="Preferred date and time must be in the future")
 
-    if (body.preferred_date - date.today()).days > 31:
+    if (body.preferred_date - now.date()).days > 31:
         raise HTTPException(status_code=400, detail="Preferred date must be within 14 days")
 
     if body.preferred_date.isoweekday() not in available_days:
@@ -65,6 +89,7 @@ def _validate_preferred_datetime(
 
 
 @router.post("", response_model=RepairRequestCreated)
+@limiter.limit("3/minutes")
 async def create_repair_request(
     body: CreateRepairRequestRequest,
     request: Request,
@@ -100,10 +125,10 @@ async def create_repair_request(
         )
 
     # find-or-create the device for this customer
-    device = rr_sql.find_device(customer_id, body.computer_name)
+    device = rr_sql.find_device(customer_id, body.computer_name) # type: ignore
     if device is None:
         device = rr_sql.create_device(
-            customer_id=customer_id,
+            customer_id=customer_id, # type: ignore
             computer_name=body.computer_name,
             computer_type=body.computer_type,
             serial_number=body.serial_number,
@@ -113,7 +138,7 @@ async def create_repair_request(
         raise HTTPException(status_code=500, detail="Failed to create device")
 
     req = rr_sql.create_repair_request(
-        customer_id=customer_id,
+        customer_id=customer_id, # type: ignore
         device_id=device.id,
         contact_detail=body.contact_detail,
         requested_service=body.requested_service,
@@ -132,11 +157,11 @@ async def create_repair_request(
     )
 
     conv = rr_sql.create_conversation_for_repair(
-        customer_id=customer_id,
+        customer_id=customer_id, # type: ignore
         repair_request_id=req.id,
     )
 
-    customer = get_user_by_id(customer_id)
+    customer = get_user_by_id(customer_id) # type: ignore
     customer_name = " ".join(
         p for p in [customer.first_name or "", customer.last_name or ""] if p # type: ignore
     ).strip() or customer.email # type: ignore
@@ -535,8 +560,25 @@ def add_repair_part(
         work_note=body.work_note,
     )
 
-    if error:
-        raise HTTPException(status_code=400, detail=error)
+    if error or row is None:
+        raise HTTPException(status_code=400, detail=error or "Could not add part to repair")
+
+    repair_detail = rr_sql.get_repair_detail(repair_request_id)
+    repair_number = repair_detail["repair_number"] if repair_detail else str(repair_request_id)
+    record_activity(
+        user.id,
+        "PART_USED_FOR_REPAIR",
+        f"Used {body.quantity_used} {row['part_name']} ({row['part_sku']}) for repair {repair_number}.",
+        target_type="part",
+        target_id=row["part_id"],
+        details={
+            "part_id": row["part_id"],
+            "sku": row["part_sku"],
+            "quantity_used": body.quantity_used,
+            "repair_request_id": repair_request_id,
+            "repair_number": repair_number,
+        },
+    )
 
     return row
 
@@ -551,9 +593,24 @@ def remove_repair_part(
     if user.role == UserRole.CUSTOMER:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    ok = rp_sql.remove_part_from_repair(repair_part_id)
-    if not ok:
+    removed = rp_sql.remove_part_from_repair(repair_part_id)
+    if removed is None:
         raise HTTPException(status_code=404, detail="Part usage not found")
+
+    repair_detail = rr_sql.get_repair_detail(repair_request_id)
+    repair_number = repair_detail["repair_number"] if repair_detail else str(repair_request_id)
+    record_activity(
+        user.id,
+        "PART_USAGE_REVERSED",
+        f"Removed {removed['quantity_restored']} {removed['part_name']} ({removed['part_sku']}) from repair {repair_number}; stock was returned.",
+        target_type="part",
+        target_id=removed["part_id"],
+        details={
+            **removed,
+            "repair_request_id": repair_request_id,
+            "repair_number": repair_number,
+        },
+    )
 
     return {"ok": True}
 

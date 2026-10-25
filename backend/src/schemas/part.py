@@ -16,6 +16,7 @@ class CreatePartRequest(BaseModel):
 class UpdatePartRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=150)
     category: str | None = Field(default=None, min_length=1, max_length=100)
+    quantity: int | None = Field(default=None, ge=0)
     reorder_threshold: int | None = Field(default=None, ge=0)
     unit_price: Decimal | None = Field(default=None, ge=0)
     supplier: str | None = Field(default=None, max_length=150)
@@ -23,3 +24,4 @@ class UpdatePartRequest(BaseModel):
 
 class RestockPartRequest(BaseModel):
     amount: int = Field(gt=0)
+    reference: str | None = Field(default=None, max_length=150)

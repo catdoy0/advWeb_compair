@@ -83,7 +83,7 @@ function ReceiveStockForm({ open, onClose, onUpdated }: ReceiveStockModalProps) 
 
     setSubmitting(true);
     try {
-      const result = await restockPart(partId, amount);
+      const result = await restockPart(partId, amount, reference);
       showMessage(result.message, result.ok);
       if (result.ok) {
         onUpdated();

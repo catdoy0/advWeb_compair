@@ -7,6 +7,7 @@ import DashboardPage from "../components/DashboardPage";
 import DashboardPanel from "../components/DashboardPanel";
 import PageHeader from "../components/PageHeader";
 import { getActivityLogs, type ActivityLogEntry } from "../../../api/administration";
+import { setIfChanged } from "../../../utils/setIfChanged";
 
 const PAGE_SIZE = 20;
 
@@ -148,7 +149,7 @@ export default function ActivityLogs() {
       <PageHeader
         eyebrow="System / Audit trail"
         title="Activity logs"
-        description="Review account, repair, checkout, and workspace changes across the system."
+        description="Review account, repair, checkout, inventory, and workspace changes across the system."
         action={
           <CommonButton
             variant="outline"
@@ -175,7 +176,7 @@ export default function ActivityLogs() {
                 setSearch(event.target.value);
                 setPage(1);
               }}
-              placeholder="Search users, repairs, actions..."
+              placeholder="Search users, repairs, inventory, actions..."
               aria-label="Search activity logs"
               className="h-9 w-full rounded-md border border-[#d8e0eb] bg-white pl-9 pr-3 text-[11px] text-[#102c50] outline-none focus:border-[#2870e8] dark:border-slate-700 dark:bg-[#182536] dark:text-white"
             />
@@ -191,6 +192,12 @@ export default function ActivityLogs() {
             columns={columns}
             data={rows}
             onRefresh={() => setRefreshTick((value) => value + 1)}
+            onPoll={async () => {
+              const result = await getActivityLogs(search.trim(), page, PAGE_SIZE);
+              if (!result) return;
+              setIfChanged(setRows, result.items);
+              setIfChanged(setTotal, result.total);
+            }}
             refreshing={loading}
             emptyMessage="No matching activity found."
           />

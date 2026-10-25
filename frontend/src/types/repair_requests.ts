@@ -81,6 +81,28 @@ export interface RepairQueueResponse {
   error?: string;
 }
 
+export interface ServiceReportData {
+  current_month: string;
+  summary: {
+    completed_requests: number;
+    average_turnaround_days: number | null;
+    received_requests: number;
+    cancelled_requests: number;
+    rejected_requests: number;
+    unsuccessful_requests: number;
+    estimated_service_value: number;
+  };
+  service_mix: Array<{ label: string; count: number; percent: number }>;
+  monthly_figures: Array<{ month: string; period: string; income: number }>;
+  service_history: Array<{
+    period: string;
+    received: number;
+    completed: number;
+    released: number;
+    value: number;
+  }>;
+}
+
 
 export interface RepairDetail {
   id: number;

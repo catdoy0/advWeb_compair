@@ -11,5 +11,6 @@ export const dummySession: UserSession = {
     firstName: "lorem",
     lastName: "imsum",
     role: "CUSTOMER",
+    hasPassword: true,
   },
 };

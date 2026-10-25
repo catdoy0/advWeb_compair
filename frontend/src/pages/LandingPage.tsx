@@ -32,8 +32,9 @@ export default function LandingPage() {
 
       {/* CONTACT */}
       <section id="contact" className="scroll-mt-20">
-      <Footer />
+        <Footer />
       </section>
+
       <ScrollToTopButton />
     </main>
   )

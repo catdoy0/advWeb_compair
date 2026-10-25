@@ -5,6 +5,7 @@ from src.models.users import UserRole
 from src.schemas.conversation import (
     SendMessageRequest,
 )
+from src.services.activity_log import record_activity
 from src.services.auth import require_active_user as _require_user
 from src.sql import conversation as conv_sql
 
@@ -108,11 +109,23 @@ def mark_read(conversation_id: int, request: Request):
     return {"ok": True}
 
 
+@router.post("/read-all")
+def mark_all_read(request: Request):
+    user = _require_user(request)
+    if user.id is None:
+        raise HTTPException(status_code=400, detail="User ID required")
+    count = conv_sql.mark_all_conversations_read(
+        user.id,
+        customer_only=user.role == UserRole.CUSTOMER,
+    )
+    return {"ok": True, "conversations_updated": count}
+
+
 @router.get("/{conversation_id}/messages")
 def get_messages(
     conversation_id: int,
     request: Request,
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(15, ge=1, le=100),
     before_id: int | None = Query(None),
 ):
     user = _require_user(request)
@@ -140,7 +153,8 @@ def get_messages(
                 p for p in [row["first_name"], row["last_name"]] if p
             ).strip() or None,
             "sender_role": row["role"],
-            "content": row["content"],
+            "content": "Deleted Message" if row["is_deleted"] else row["content"],
+            "is_deleted": row["is_deleted"],
             "created_at": row["created_at"],
         })
 
@@ -192,5 +206,48 @@ async def send_message(
         "conversation_id": conversation_id,
         "sender_id": user.id,
         "content": message.content,
+        "is_deleted": False,
         "created_at": message.created_at,
     }
+
+
+@router.delete("/{conversation_id}/messages/{message_id}")
+async def delete_message(conversation_id: int, message_id: int, request: Request):
+    user = _require_user(request)
+
+    conv = conv_sql.get_conversation(conversation_id)
+    if conv is None or conv.archived_at is not None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if user.role == UserRole.CUSTOMER and conv.customer_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if user.id is None:
+        raise HTTPException(status_code=400, detail="User ID is missing")
+
+    message = conv_sql.get_message(conversation_id, message_id)
+    if message is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+    can_moderate = user.role in (UserRole.ADMIN, UserRole.SUPER_ADMIN)
+    if message.sender_id != user.id and not can_moderate:
+        raise HTTPException(status_code=403, detail="You can only delete your own messages")
+    if not message.is_deleted and conv_sql.mark_message_deleted(message_id):
+        record_activity(
+            user.id,
+            "MESSAGE_DELETED",
+            f"Marked message {message_id} in conversation {conversation_id} as deleted.",
+            target_type="message",
+            target_id=message_id,
+            details={
+                "conversation_id": conversation_id,
+                "repair_request_id": conv.repair_request_id,
+                "message_sender_id": message.sender_id,
+            },
+        )
+        await broadcaster.publish_message(
+            conversation_id=conversation_id,
+            message_id=message_id,
+            sender_id=message.sender_id,
+            deleted=True,
+        )
+
+    return {"message_id": message_id, "content": "Deleted Message", "is_deleted": True}

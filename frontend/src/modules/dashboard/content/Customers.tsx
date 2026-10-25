@@ -9,6 +9,7 @@ import PageHeader from "../components/PageHeader";
 import DashboardPage from "../components/DashboardPage";
 import DashboardPanel from "../components/DashboardPanel";
 import SummaryCard from "./administration/SummaryCard";
+import { setIfChanged } from "../../../utils/setIfChanged";
 
 const PAGE_SIZE = 10;
 
@@ -186,6 +187,10 @@ export default function Customers() {
             columns={columns}
             data={customers}
             onRefresh={() => setRefreshTick((tick) => tick + 1)}
+            onPoll={async () => {
+              const result = await getCustomers(page, PAGE_SIZE, search.trim());
+              if (result) setIfChanged(setData, result);
+            }}
             refreshing={loading}
             emptyMessage={search ? "No customers match your search." : "No customer accounts yet."}
           />

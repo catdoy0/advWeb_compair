@@ -10,16 +10,15 @@ import { getStoreSettings } from "../../../api/auth"
 import type { StoreSettings } from "../../../types/auth"
 
 const serviceLinks = [
-  "Repair requests",
-  "Appointments",
-  "Status tracking",
-  "Service history",
+  { label: "Repair requests", href: "#service-repair-requests" },
+  { label: "Appointments", href: "#service-appointments" },
+  { label: "Status tracking", href: "#service-status-tracking" },
+  { label: "Service history", href: "#service-history" },
 ]
 
 const companyLinks = [
-  "How it works",
-  "Why Compair",
-  "Contact support",
+  { label: "How it works", href: "#how-it-works" },
+  { label: "Why Compair", href: "#why-compair" },
 ]
 
 function FooterLinks({
@@ -27,7 +26,7 @@ function FooterLinks({
   links,
 }: {
   title: string
-  links: string[]
+  links: { label: string; href: string }[]
 }) {
   return (
     <div>
@@ -36,10 +35,10 @@ function FooterLinks({
       </h3>
 
       <div className="mt-3 space-y-2">
-        {links.map((link) => (
+        {links.map(({ label, href }) => (
           <a
-            key={link}
-            href="#"
+            key={label}
+            href={href}
             className="
               block
               text-3xs
@@ -47,7 +46,7 @@ function FooterLinks({
               hover:text-[#194b9d] dark:hover:text-blue-300
             "
           >
-            {link}
+            {label}
           </a>
         ))}
       </div>

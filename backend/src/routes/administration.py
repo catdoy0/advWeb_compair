@@ -363,13 +363,12 @@ def archive_account(user_id: int, request: Request, response: Response):
     state = admin_sql.get_user_state(user_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Account not found")
-    target_role, target_is_active = state
-    if (
-        target_role == UserRole.SUPER_ADMIN.value
-        and target_is_active
-        and admin_sql.count_active_super_admins() <= 1
-    ):
-        raise HTTPException(status_code=400, detail="Cannot archive the last active super admin")
+    _, target_is_active = state
+    if target_is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Suspend the account before archiving it",
+        )
     target = admin_sql.get_user_identity(user_id)
     if not admin_sql.archive_user(user_id):
         raise HTTPException(status_code=404, detail="Account not found or already archived")

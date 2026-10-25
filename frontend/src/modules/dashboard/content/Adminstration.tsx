@@ -17,8 +17,10 @@ import EditAccountModal from "./administration/EditAccountModal";
 import DatabaseBackups from "./DatabaseBackups";
 import type { Account } from "./administration/types";
 import { useAccountsAdmin } from "../../../hooks/administration";
+import { useAuth } from "../../../context/AuthContext";
 
 const accountColumns = (
+  canEditAndArchive: boolean,
   onEdit: (account: Account) => void,
   onSuspend: (account: Account) => void,
   onArchive: (account: Account) => void,
@@ -72,6 +74,8 @@ account.status === "Active"
     render: (account) => (
       <AccountActions
         account={account}
+        canEdit={canEditAndArchive}
+        canArchive={canEditAndArchive}
         onEdit={onEdit}
         onSuspend={onSuspend}
         onArchive={onArchive}
@@ -82,9 +86,12 @@ account.status === "Active"
 
 export default function Adminstration() {
   const admin = useAccountsAdmin();
+  const { session } = useAuth();
+  const canEditAndArchiveAccounts = session?.user.role !== "ADMIN";
   const [snapshotCount, setSnapshotCount] = useState(0);
 
   const columns = accountColumns(
+    canEditAndArchiveAccounts,
     admin.handleEditClick,
     admin.handleSuspendClick,
     admin.handleArchiveClick,
@@ -221,6 +228,7 @@ export default function Adminstration() {
             columns={columns}
             data={admin.accounts}
             onRefresh={admin.reload}
+            onPoll={admin.poll}
             refreshing={admin.loading}
             emptyMessage="No accounts found for this role."
           />
