@@ -42,7 +42,7 @@ const customersItem = { label: "Customers", href: dashboardPath(D.CUSTOMERS), ic
 const devicesItem = { label: "Devices", href: dashboardPath(D.DEVICES), icon: Monitor };
 const techniciansItem = { label: "Technicians", href: dashboardPath(D.TECHNICIANS), icon: UserCog };
 // const staffItem = { label: "TODO:Staff", href: dashboardPath(D.STAFF), icon: UsersRound };
-const reportsItem = { label: "TODO:Reports", href: dashboardPath(D.REPORTS), icon: BarChart3 };
+const reportsItem = { label: "Reports", href: dashboardPath(D.REPORTS), icon: BarChart3 };
 
 // const defaultSections: DashboardSidebarSection[] = [];
 

@@ -1,6 +1,8 @@
+import re
 import secrets
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 from sqlmodel import Session, select
@@ -31,6 +33,35 @@ WORKFLOW_ORDER = [
     "COMPLETED",
     "RELEASED",
 ]
+
+SERVICE_CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "Diagnostics": (
+        "diagnostic", "diagnostics", "troubleshoot", "troubleshooting",
+        "inspection", "system check", "checkup", "check up", "slow", "turn",
+        "off", "test"
+    ),
+    "Hardware repair": (
+        "hardware", "battery", "screen", "display", "keyboard", "trackpad",
+        "touchpad", "motherboard", "mainboard", "charging port", "power jack",
+        "fan", "cooling", "hinge", "casing", "ram", "memory", "ssd", "hdd",
+        "hard drive", "storage", "nvme", "speaker", "camera", "replacement",
+        "replace", "physical damage", "liquid damage", "component",
+    ),
+    "OS & software": (
+        "software", "operating system", "windows", "macos", "linux", " os ",
+        "reinstall", "install os", "driver", "virus", "malware", "data recovery",
+        "system restore", "firmware", "anti"
+    ),
+}
+
+
+def _service_category(service: str | None) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", (service or "").casefold()).strip()
+    padded = f" {normalized} "
+    for category, keywords in SERVICE_CATEGORY_KEYWORDS.items():
+        if any(f" {keyword.strip()} " in padded for keyword in keywords):
+            return category
+    return "Other services"
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -397,6 +428,140 @@ def count_repair_queue_by_status() -> dict[str, int]:
     return counts
 
 
+def get_service_report(month_count: int = 8, report_month: date | None = None) -> dict:
+    """Build recent repair reporting data from request and estimate records."""
+    report_timezone = ZoneInfo("Asia/Manila")
+    now = datetime.now(report_timezone)
+    selected_month = report_month or date(now.year, now.month, 1)
+    current_month = date(selected_month.year, selected_month.month, 1)
+    month_index = current_month.year * 12 + current_month.month - 1 - (month_count - 1)
+    period_start_date = date(month_index // 12, month_index % 12 + 1, 1)
+    next_month_index = current_month.year * 12 + current_month.month
+    period_end_date = date(next_month_index // 12, next_month_index % 12 + 1, 1)
+    period_start = datetime.combine(period_start_date, time.min, tzinfo=report_timezone)
+    period_end = datetime.combine(period_end_date, time.min, tzinfo=report_timezone)
+
+    with Session(engine) as s:
+        rows = s.execute(text("""
+            SELECT
+                rr.created_at,
+                rr.updated_at,
+                rr.status::text AS status,
+                rr.requested_service,
+                rr.reported_problem,
+                r.estimate_amount
+            FROM repair_requests rr
+            LEFT JOIN repairs r ON r.repair_request_id = rr.id
+            WHERE rr.created_at >= :period_start
+              AND rr.created_at < :period_end
+            ORDER BY rr.created_at ASC
+        """), {"period_start": period_start, "period_end": period_end}).mappings().all()
+
+    months = []
+    month_lookup: dict[tuple[int, int], dict] = {}
+    for offset in range(month_count):
+        absolute_month = period_start_date.year * 12 + period_start_date.month - 1 + offset
+        month_date = date(absolute_month // 12, absolute_month % 12 + 1, 1)
+        bucket = {
+            "month": month_date.strftime("%b"),
+            "period": month_date.strftime("%B %Y"),
+            "year": month_date.year,
+            "month_number": month_date.month,
+            "income": 0.0,
+            "received": 0,
+            "completed": 0,
+            "released": 0,
+            "cancelled": 0,
+            "rejected": 0,
+        }
+        months.append(bucket)
+        month_lookup[(month_date.year, month_date.month)] = bucket
+
+    service_counts: dict[str, int] = {}
+    released_durations: list[float] = []
+    for row in rows:
+        created_at = row["created_at"]
+        is_current_month = (created_at.year, created_at.month) == (current_month.year, current_month.month)
+        bucket = month_lookup.get((created_at.year, created_at.month))
+        if bucket is None:
+            continue
+
+        status = row["status"]
+        bucket["received"] += 1
+        if row["estimate_amount"] is not None:
+            bucket["income"] += float(row["estimate_amount"])
+        if status == "COMPLETED":
+            bucket["completed"] += 1
+        elif status == "RELEASED":
+            bucket["released"] += 1
+            if row["updated_at"] is not None and is_current_month:
+                updated_at = row["updated_at"]
+                if created_at.tzinfo is None and updated_at.tzinfo is not None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                elif created_at.tzinfo is not None and updated_at.tzinfo is None:
+                    updated_at = updated_at.replace(tzinfo=timezone.utc)
+                duration = (updated_at - created_at).total_seconds() / 86_400
+                if duration >= 0:
+                    released_durations.append(duration)
+        elif status == "CANCELLED":
+            bucket["cancelled"] += 1
+        elif status == "REJECTED":
+            bucket["rejected"] += 1
+
+        if is_current_month:
+            service = _service_category(row["requested_service"])
+            if service == "Other services":
+                service = _service_category(row["reported_problem"])
+            service_counts[service] = service_counts.get(service, 0) + 1
+
+    current_bucket = month_lookup[(current_month.year, current_month.month)]
+    completed_count = current_bucket["completed"] + current_bucket["released"]
+    service_total = sum(service_counts.values())
+    service_mix = [
+        {
+            "label": label,
+            "count": count,
+            "percent": round(count * 100 / service_total) if service_total else 0,
+        }
+        for label, count in sorted(service_counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+    return {
+        "current_month": current_month.isoformat(),
+        "summary": {
+            "completed_requests": completed_count,
+            "average_turnaround_days": (
+                round(sum(released_durations) / len(released_durations), 1)
+                if released_durations else None
+            ),
+            "received_requests": current_bucket["received"],
+            "cancelled_requests": current_bucket["cancelled"],
+            "rejected_requests": current_bucket["rejected"],
+            "unsuccessful_requests": current_bucket["cancelled"] + current_bucket["rejected"],
+            "estimated_service_value": round(current_bucket["income"], 2),
+        },
+        "service_mix": service_mix,
+        "monthly_figures": [
+            {
+                "month": bucket["month"],
+                "period": bucket["period"],
+                "income": round(bucket["income"], 2),
+            }
+            for bucket in months
+        ],
+        "service_history": [
+            {
+                "period": bucket["period"],
+                "received": bucket["received"],
+                "completed": bucket["completed"],
+                "released": bucket["released"],
+                "value": round(bucket["income"], 2),
+            }
+            for bucket in reversed(months[-3:])
+        ],
+    }
+
+
 def _serialize_repair_detail(row) -> dict:
     customer_name = _person_name(
         row["customer_first"], row["customer_last"], row["customer_email"]
@@ -538,7 +703,7 @@ def unassign_open_repairs_for_technician(technician_id: int) -> int:
               AND rr.status NOT IN ('RELEASED', 'CANCELLED', 'REJECTED')
         """), {"technician_id": technician_id})
         s.commit()
-        return result.rowcount or 0
+        return result.rowcount or 0 # type: ignore
 
 
 def _ensure_repair_and_assign(
@@ -1137,7 +1302,7 @@ def checkout_repair(
         ).first()
         if payment is None:
             s.add(Payments(
-                repair_id=repair.id,
+                repair_id=repair.id, # type: ignore
                 amount=Decimal(str(total)),
                 payment_method=PaymentMethod.CASH,
                 status=PaymentStatus.PAID,
@@ -1244,4 +1409,4 @@ def set_repair_receipt_path(repair_request_id: int, receipt_path: str) -> bool:
             "receipt_path": receipt_path,
         })
         s.commit()
-        return result.rowcount > 0
+        return result.rowcount > 0 # type: ignore

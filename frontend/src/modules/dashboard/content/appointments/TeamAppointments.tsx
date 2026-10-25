@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
+import { Link } from "react-router";
 
+import CommonButton from "../../../../components/common/widgets/CommonButton";
 import DataTable, {
   type DataTableColumn,
 } from "../../../../components/common/widgets/DataTable";
@@ -130,34 +132,55 @@ export default function TeamAppointments() {
     setWeekReference((w) => w.add(7, "day"));
   };
 
+  const handleCurrentWeek = () => {
+    const today = dayjs();
+    setWeekReference(today);
+    setSelectedDate(today);
+  };
+
   const columns: DataTableColumn<ApiAppointment>[] = [
     {
       key: "scheduled_time",
       label: "Time",
-      className: "w-[13%]",
+      className: "w-[12%]",
       render: (a) => formatTime(a.scheduled_time),
     },
     {
       key: "customer_name",
       label: "Customer",
-      className: "w-[24%]",
+      className: "w-[21%]",
       render: (a) => a.customer_name || "—",
     },
     {
       key: "computer_name",
       label: "Computer",
-      className: "w-[25%]",
+      className: "w-[22%]",
     },
     {
       key: "requested_service",
       label: "Service",
-      className: "w-[23%]",
+      className: "w-[21%]",
     },
     {
       key: "status",
       label: "Status",
-      className: "w-[15%]",
+      className: "w-[14%]",
       render: (a) => <StatusBox status={toStatusEnum(a.status)} />,
+    },
+    {
+      key: "repair_detail",
+      label: "",
+      className: "w-[10%]",
+      sortable: false,
+      render: (a) => (
+        <Link
+          to={`/dashboard/repair-queue?id=${a.repair_request_id}`}
+          className="flex items-center gap-1 text-[11px] font-semibold text-[#2870e8] hover:underline"
+        >
+          View details
+          <ChevronRight size={12} />
+        </Link>
+      ),
     },
   ];
 
@@ -199,6 +222,14 @@ export default function TeamAppointments() {
             >
               <ChevronLeft size={16} />
             </button>
+
+            <CommonButton
+              variant="outline"
+              className="py-1!"
+              onClick={handleCurrentWeek}
+            >
+              Today
+            </CommonButton>
 
             <button
               type="button"

@@ -102,7 +102,10 @@ def change_password(user_id: int, changePassword: ChangePassword):
             if user is None:
                 return {"success": False, "message": "User not found"}
 
-            if not verify_password(changePassword.currentPassword, user.password_hash):
+            if user.password_hash and (
+                not changePassword.currentPassword
+                or not verify_password(changePassword.currentPassword, user.password_hash)
+            ):
                 return {"success": False, "message": "Current password is incorrect"}
 
             new_hash = hash_password(changePassword.newPassword)

@@ -10,6 +10,7 @@ import {
   Wrench,
 } from "lucide-react";
 import dayjs from "dayjs";
+import Papa from "papaparse";
 
 import { getAdminOverview } from "../../../../api/administration";
 import type { AdminOverviewData } from "../../../../types/administration";
@@ -60,9 +61,7 @@ export function exportSnapshot(data: AdminOverviewData) {
     ["Appointments", String(data.schedule.length)],
     ["Unread messages", String(data.unread_messages)],
   ];
-  const csv = rows
-    .map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(","))
-    .join("\n");
+  const csv = Papa.unparse(rows);
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a");
   link.href = url;

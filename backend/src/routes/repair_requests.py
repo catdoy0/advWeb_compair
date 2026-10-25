@@ -37,6 +37,23 @@ DAY_CAPACITY = 6
 BUSINESS_TIMEZONE = ZoneInfo("Asia/Manila")
 
 
+@router.get("/reports")
+def get_service_report(request: Request, month: str | None = Query(default=None)):
+    user = _require_user(request)
+    if user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Only administrators can view service reports")
+    report_month = None
+    if month:
+        try:
+            parsed_month = datetime.strptime(month, "%Y-%m")
+            if parsed_month.strftime("%Y-%m") != month:
+                raise ValueError
+            report_month = parsed_month.date()
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Month must use YYYY-MM format") from exc
+    return rr_sql.get_service_report(month_count=8, report_month=report_month)
+
+
 def _validate_preferred_datetime(
     body: CreateRepairRequestRequest,
     available_times: list[str],

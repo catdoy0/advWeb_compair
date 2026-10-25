@@ -174,7 +174,9 @@ export default function Profile() {
   }
 
   async function handleUpdatePassword() {
-    const nextCurrentError = validateRequired(currentPassword, "Current password");
+    const nextCurrentError = user.hasPassword
+      ? validateRequired(currentPassword, "Current password")
+      : "";
     const nextNewError = validateNewPassword(newPassword, currentPassword);
     const nextConfirmError = !confirmPassword
       ? "Please confirm your new password."
@@ -191,7 +193,7 @@ export default function Profile() {
     setSavingPassword(true);
     try {
       const result = await changePassword({
-        currentPassword,
+        ...(user.hasPassword ? { currentPassword } : {}),
         newPassword,
         confirmPassword,
       });
@@ -374,7 +376,7 @@ export default function Profile() {
           headerClassName="py-3"
         >
           <div className="p-5">
-            <CommonInput
+            {user.hasPassword && <CommonInput
               id="current-password"
               label="Current password"
               variant="password"
@@ -385,7 +387,7 @@ export default function Profile() {
                 if (currentPasswordError) setCurrentPasswordError("");
               }}
               error={currentPasswordError}
-            />
+            />}
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <CommonInput

@@ -11,6 +11,7 @@ import type {
   RepairPartUsage,
   RepairQueueResponse,
   RepairRequestCreated,
+  ServiceReportData,
   NextAppointmentPage,
   WorkspaceResponse,
   TeamDevice,
@@ -90,6 +91,17 @@ export async function listRepairQueue(
     return { items: [], counts: {}, error };
   }
   return await res.json();
+}
+
+export async function getServiceReport(month: string): Promise<ServiceReportData | null> {
+  try {
+    const params = new URLSearchParams({ month });
+    const res = await apiFetch(`repair-requests/reports?${params}`, { method: "GET" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 

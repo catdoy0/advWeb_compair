@@ -5,7 +5,7 @@ export interface ChangeEmailRequest {
 
 
 export interface ChangePasswordRequest {
-  currentPassword: string
+  currentPassword?: string
   newPassword: string
   confirmPassword: string
 }

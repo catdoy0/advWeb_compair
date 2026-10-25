@@ -1,4 +1,3 @@
-import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, Request, status
@@ -27,6 +26,7 @@ def serialize_user(user: Users) -> dict:
         "firstName": user.first_name,
         "lastName": user.last_name,
         "role": user.role.value,
+        "hasPassword": bool(user.password_hash),
         "avatarUrl": user.avatar_url,
         "avatar_url": user.avatar_url,
         "nameChangeAvailableAt": (
@@ -71,7 +71,7 @@ def signup_user(data: SignUpRequest) -> tuple[Users, str, str]:
 
 def signin_user(data: LoginRequest) -> tuple[Users, str, str]:
     user = auth_sql.get_user_by_email(data.email.lower())
-    if not user or not verify_password(data.password, user.password_hash):
+    if not user or not verify_password(data.password, user.password_hash): # type: ignore
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -131,8 +131,7 @@ def signin_google_user(claims: dict) -> tuple[Users, str, str]:
                 first_name=(given_name or "")[:72] or None,
                 last_name=(family_name or "")[:72] or None,
                 email=email,
-                # OAuth-only accounts still satisfy the existing non-null password column.
-                password_hash=hash_password(secrets.token_urlsafe(48)),
+                password_hash=None,
                 oauth_provider="google",
                 oauth_id=google_id,
                 avatar_url=(claims.get("picture") or "")[:500] or None,

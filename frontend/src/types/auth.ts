@@ -12,6 +12,7 @@ export interface UserSession {
     firstName: string;
     lastName: string;
     role: Role;
+    hasPassword: boolean;
     avatarUrl?: string | null;
     avatar_url?: string | null;
     nameChangeAvailableAt?: string | null;
